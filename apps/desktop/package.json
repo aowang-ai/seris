@@ -1,13 +1,14 @@
 {
   "name": "@seris/desktop",
-  "version": "0.1.0-beta.0",
+  "version": "0.1.0-beta.1",
   "private": true,
   "type": "module",
   "description": "Seris desktop shell (Tauri). Thin packaging layer: spawns and supervises the @seris/core gateway; the WebView talks straight to the gateway over same-origin HTTP+SSE.",
   "scripts": {
     "tauri": "tauri",
-    "dev": "tauri dev",
-    "build:app": "tauri build"
+    "prepare": "pnpm --dir ../core build && node scripts/prepare-resources.mjs",
+    "dev": "pnpm --dir ../core build && node scripts/prepare-resources.mjs && tauri dev",
+    "build:app": "pnpm --dir ../core build && node scripts/prepare-resources.mjs && tauri build"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

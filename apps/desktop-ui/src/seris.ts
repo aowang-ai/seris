@@ -10,7 +10,11 @@ import type {
   MarketNews,
 } from '../../core/src/markets/types';
 import { PROTOCOL_VERSION, isModelConfig, isChatEvent, isCursor, isSnapshot, type ChatEvent, type Cursor, type SessionMeta, type SessionSnapshot, type ModelConfig, type ModelConnectionInput, type ModelSelection, type ProviderInfo, type ModelDiscovery, type LocalModelService } from '../../core/src/protocol';
+import type { BacktestRunSummary } from '../../core/src/strategy/store';
+import type { BacktestResult } from '../../core/src/strategy/runner';
 export type { SessionMeta, HistoryEntry, RunRecord, ApprovalRequest, ModelConfig, ModelConnectionInput, ModelSelection, ProviderInfo, ConnectionStatus, ModelOption, LocalModelService } from '../../core/src/protocol';
+export type { BacktestRunSummary };
+export type BacktestRunDetail = BacktestResult;
 declare global {
   interface Window {
     __SERIS_TICKET__?:string|null;
@@ -120,6 +124,13 @@ export const seris={
   approve:(id:string,runId:string,allowed:boolean)=>call('/api/approvals',{method:'POST',body:JSON.stringify({kind:'tool',id,runId,decision:allowed?'approve':'reject'})}),
   goalApprovals:()=>call<{goals:{id:string;status:string;reason:string;payload:unknown}[]}>('/api/approvals'),
   decideGoal:(id:string,allowed:boolean)=>call('/api/approvals',{method:'POST',body:JSON.stringify({kind:'goal',id,decision:allowed?'approve':'reject'})}),
+  strategiesList:()=>call<{strategies:{name:string;description:string;valid:boolean;problems?:string[]}[]}>('/api/strategies/list'),
+  strategyGet:(name:string)=>call<{name:string;description?:string;timeframe?:string;params?:Record<string,{type:string;default:number|boolean|string;min?:number;max?:number;description?:string}>;valid:boolean;problems?:string[];source:string;skillDoc?:string}>(`/api/strategies/get?name=${encodeURIComponent(name)}`),
+  strategyBacktests:(name?:string)=>{
+    const qs=name?`?name=${encodeURIComponent(name)}`:'';
+    return call<{runs:BacktestRunSummary[]}>(`/api/strategies/backtests${qs}`);
+  },
+  strategyBacktestGet:(id:string)=>call<BacktestRunDetail>(`/api/strategies/backtests/get?id=${encodeURIComponent(id)}`),
   shellStatus:()=>window.__TAURI__?.core.invoke<{ready:boolean;circuitBroken:boolean;tail:string}>('gateway_status'),
   /** Sequential reader: pause applying deltas while the UI restores a watermarked snapshot. */
   onChatEvent:(cb:(e:ChatEvent,cursor:Cursor)=>void,onReady:()=>Promise<void>,onStatus:(connected:boolean,error?:string)=>void):(()=>void)=>{

@@ -75,7 +75,12 @@ export async function scanSkillsDir(skillsRoot: string): Promise<SkillSummary[]>
       continue;
     }
     if (!st.isDirectory()) continue;
-    if (dir === 'installed') { summaries.push(...await scanSkillsDir(dirPath)); continue; }
+    // Both 'installed' (user-installed) and 'concepts'/'strategies' (our
+    // categorized namespaces) hold sub-directories with their own SKILL.md files.
+    if (dir === 'installed' || dir === 'concepts' || dir === 'strategies') {
+      summaries.push(...await scanSkillsDir(dirPath));
+      continue;
+    }
     const summary = await readSummary(dir, dirPath);
     if (summary) summaries.push(summary);
   }

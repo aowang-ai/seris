@@ -1,7 +1,9 @@
 import { contextLabel, time } from './marketUi';
 import { useI18n } from '../i18n';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Markdown } from './Markdown';
+import { ApprovalCard } from './ApprovalCard';
+import { TextOutput } from './TextDetails';
 import { ModelPicker, connectionModelChoices } from './ModelPicker';
 import type {
   HistoryEntry,
@@ -34,6 +36,43 @@ export interface ChatPanelProps {
   compact?: boolean;
   header?: ReactNode;
 }
+
+function ToolResult({ message: m }: { message: HistoryEntry }) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const outputId = useId();
+  const label = t(m.pending ? 'Using {tool}…' : m.isError ? '{tool} failed' : 'Used {tool}', { tool: m.toolName ?? '' });
+  return (
+    <div className="chat-tool">
+      <button
+        type="button"
+        className={`chat-tool-trigger ${m.pending ? 'pending' : m.isError ? 'failed' : ''}`}
+        disabled={!m.text}
+        aria-expanded={m.text ? open : undefined}
+        aria-controls={m.text ? outputId : undefined}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <svg className="chat-tool-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
+          <circle cx="6.5" cy="6.5" r="3.5" />
+          <circle cx="17.5" cy="17.5" r="3.5" />
+          <path d="M15 4.5a3.5 3.5 0 0 1 5 5l-2 2a3.5 3.5 0 0 1-5-5Zm-8 8a3.5 3.5 0 0 1 5 5l-2 2a3.5 3.5 0 0 1-5-5Z" />
+        </svg>
+        <span>{label}</span>
+        {m.text && (
+          <svg className="chat-tool-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        )}
+      </button>
+      {m.text && (
+        <div id={outputId} className="chat-tool-output" hidden={!open}>
+          {open && <TextOutput text={m.text} formatJson />}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ChatPanel(p: ChatPanelProps) {
   const { t, language, locale } = useI18n();
   const log = useRef<HTMLDivElement>(null);
@@ -116,18 +155,7 @@ export function ChatPanel(p: ChatPanelProps) {
                   {m.text}
                 </div>
               ) : m.role === 'tool' ? (
-                <div className="chat-tool">
-                  <span
-                    className={`tool-dot ${m.pending ? 'pending' : m.isError ? 'failed' : ''}`}
-                  />
-                  <span>{m.toolName}</span>
-                  {m.text && (
-                    <details>
-                      <summary>{t('Result')}</summary>
-                      <pre>{m.text}</pre>
-                    </details>
-                  )}
-                </div>
+                <ToolResult message={m} />
               ) : (
                 <div className="chat-answer">
                   <Markdown text={m.text} />
@@ -153,16 +181,7 @@ export function ChatPanel(p: ChatPanelProps) {
             <p className="muted">{t('Thinking…')}</p>
           )}
           {p.approvals.map((a) => (
-            <div key={a.id} className="chat-approval">
-              <strong>{t('Approve {tool}', { tool: a.toolName })}</strong>
-              <pre>{JSON.stringify(a.args, null, 2)}</pre>
-              <button onClick={() => p.onApprove(a, true)}>
-                {t('Allow once')}
-              </button>
-              <button onClick={() => p.onApprove(a, false)}>
-                {t('Reject')}
-              </button>
-            </div>
+            <ApprovalCard key={a.id} approval={a} onApprove={p.onApprove} />
           ))}
         </div>
       </div>

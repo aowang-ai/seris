@@ -45,11 +45,8 @@ import type {
   MarketNotification,
 } from '../../core/src/markets/types';
 import { SettingsPage } from './components/SettingsPage';
-import {
-  StrategiesPanel,
-  AutomationPanel,
-  PortfolioPanel,
-} from './components/Workbench';
+import { StrategiesPanel } from './components/StrategiesPanel';
+import { AutomationPanel, PortfolioPanel } from './components/Workbench';
 
 type View =
   | 'chat'

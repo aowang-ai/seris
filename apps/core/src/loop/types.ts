@@ -51,6 +51,7 @@ export type ToolCategory =
   | 'connectors'
   | 'workspace'
   | 'skills'
+  | 'strategies'
   | 'misc';
 
 import type { AgentTool as PiAgentTool } from '@earendil-works/pi-agent-core';

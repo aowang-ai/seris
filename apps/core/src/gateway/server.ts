@@ -60,6 +60,10 @@ export async function startGateway(opts:GatewayOptions):Promise<GatewayHandle>{
     }
     if(path==='/api/app-info'){sendJson(res,200,{name:'Seris',product:'personal trading workbench',protocolVersion:PROTOCOL_VERSION});return;}
     if(path.startsWith('/api/markets/')){sendJson(res,200,await marketRoute(path,method,url,()=>readBody(req),opts.markets));return;}
+    if(path.startsWith('/api/strategies/')){
+      const {strategyRoute}=await import('./strategies.js');
+      sendJson(res,200,await strategyRoute(path,method,url,()=>readBody(req)));return;
+    }
     if(path==='/api/config'&&method==='GET'){sendJson(res,200,runtime.modelConfig());return;}
     if(path==='/api/config/providers'&&method==='GET'){sendJson(res,200,providerCatalog());return;}
     if(path==='/api/config/local-models'&&method==='GET'){sendJson(res,200,await detectLocalModels());return;}

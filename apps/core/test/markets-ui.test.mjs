@@ -124,6 +124,15 @@ test('Markets renders candles, preserves Chat and rejects a late BTC view action
     await page.getByRole('region', { name: '市场对话', exact: true }).waitFor();
     await page.getByRole('region', { name: '市场对话', exact: true }).waitFor();
     await page.getByText('BTC analysis complete', { exact: true }).waitFor();
+    const resultButton = page.getByRole('button', { name: '已调用 fixture_wait', exact: true });
+    await resultButton.click();
+    assert.equal(await resultButton.getAttribute('aria-expanded'), 'true');
+    assert.match(await page.locator('.chat-tool-output pre').innerText(), /late-btc-action/);
+    assert.equal(await page.getByRole('dialog').count(), 0);
+    await resultButton.press('Enter');
+    assert.equal(await resultButton.getAttribute('aria-expanded'), 'false');
+    assert.equal(await page.locator('.chat-tool-output pre').count(), 0);
+    assert.equal(await resultButton.evaluate((el) => el === document.activeElement), true);
     assert.ok(
       await page
         .getByRole('button', {
@@ -931,7 +940,7 @@ test('language preference translates all workspaces and Markets dialogs without 
       await page.evaluate(() => localStorage.getItem('seris.language')),
       'en',
     );
-    for (const label of ['Strategies', 'Automation', 'Portfolio']) {
+    for (const label of ['Automation', 'Portfolio']) {
       await page.getByRole('button', { name: label, exact: true }).click();
       await page.getByRole('heading', { name: label, exact: true }).waitFor();
       assert.match(
@@ -943,6 +952,17 @@ test('language preference translates all workspaces and Markets dialogs without 
         /[\p{Script=Han}]/u,
       );
     }
+    // Strategies is a real workspace now — assert it has the catalog copy.
+    await page.getByRole('button', { name: 'Strategies', exact: true }).click();
+    await page.getByRole('heading', { name: 'Strategies', exact: true }).first().waitFor();
+    assert.match(
+      await page.locator('main').innerText(),
+      /Ask Seris to|Tell Seris to|Pick a strategy/,
+    );
+    assert.doesNotMatch(
+      await page.locator('main').innerText(),
+      /[\p{Script=Han}]/u,
+    );
     await page.getByRole('button', { name: 'Markets', exact: true }).click();
     await page.getByLabel('BTC candlestick chart').waitFor();
     assert.equal(
@@ -1005,15 +1025,22 @@ test('language preference translates all workspaces and Markets dialogs without 
     await page
       .getByRole('combobox', { name: 'Language', exact: true })
       .selectOption('zh-CN');
-    for (const label of ['策略', '自动化', '持仓']) {
+    for (const label of ['自动化', '持仓']) {
       await page.getByRole('button', { name: label, exact: true }).click();
       await page.getByRole('heading', { name: label, exact: true }).waitFor();
       assert.match(await page.locator('main').innerText(), /此页面正在开发中/);
       assert.doesNotMatch(
         await page.locator('main').innerText(),
-        /Strategies|Automation|Portfolio|under development/,
+        /Automation|Portfolio|under development/,
       );
     }
+    // 策略页是真页面了
+    await page.getByRole('button', { name: '策略', exact: true }).click();
+    await page.getByRole('heading', { name: '策略', exact: true }).first().waitFor();
+    assert.match(
+      await page.locator('main').innerText(),
+      /告诉 Seris|还没有策略|从左侧选择一个策略/,
+    );
     await page.getByRole('button', { name: '市场', exact: true }).click();
     await page
       .getByText('BTC 资金费率 ≤ -0.01 % / 小时', { exact: true })

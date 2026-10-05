@@ -114,12 +114,18 @@ test('built UI discovers models, saves multiple choices, scopes blank keys, and 
       await page.getByText('text-embedding-fixture', { exact: true }).count(),
       0,
     );
-    await page
-      .locator('details')
-      .filter({ has: page.getByText('Advanced settings', { exact: true }) })
-      .locator('summary')
-      .click();
     await page.getByLabel('Service name', { exact: true }).fill('Custom AI');
+    await page.getByRole('tab', { name: 'Model parameters', exact: true }).click();
+    await page.getByLabel('Context window', { exact: true }).fill('65536');
+    await page.getByLabel('Max output tokens', { exact: true }).fill('0');
+    await page.getByRole('tab', { name: 'Connection and models', exact: true }).click();
+    assert.equal(await page.getByLabel('Service name', { exact: true }).inputValue(), 'Custom AI');
+    // Invalid fields on the other tab must be revealed before reporting validation.
+    await page.getByRole('button', { name: 'Save changes', exact: true }).click();
+    assert.equal(await page.getByRole('tab', { name: 'Model parameters', exact: true }).getAttribute('aria-selected'), 'true');
+    await page.getByLabel('Max output tokens', { exact: true }).fill('4096');
+    await page.getByRole('tab', { name: 'Model parameters', exact: true }).press('ArrowLeft');
+    assert.equal(await page.getByLabel('API key', { exact: true }).inputValue(), 'fixture-not-real-key');
     await page
       .getByRole('button', { name: 'Save changes', exact: true })
       .click();
@@ -127,6 +133,8 @@ test('built UI discovers models, saves multiple choices, scopes blank keys, and 
     assert.equal(runtime.configured, true);
     const id = runtime.modelConfig().selected.connectionId;
     assert.equal(runtime.modelConfig().connections[0].models.length, 2);
+    assert.equal(runtime.modelConfig().connections[0].contextWindow, 65536);
+    assert.equal(runtime.modelConfig().connections[0].maxTokens, 4096);
     assert.equal(requests[0].auth, 'Bearer fixture-not-real-key');
     const stored = await readFile(join(dir, '.data/models.json'), 'utf8');
     assert.equal(stored.includes('fixture-not-real-key'), false);
@@ -197,10 +205,11 @@ test('built UI discovers models, saves multiple choices, scopes blank keys, and 
       .getByRole('option')
       .filter({ hasText: 'updated-fixture' })
       .click();
+    const configurationError = 'Fixture configuration failure\n' + 'Diagnostic context for the failed save. '.repeat(20);
     await page.route('**/api/config/connections', (route) =>
       route.fulfill({
         status: 500,
-        json: { error: 'Fixture configuration failure' },
+        json: { error: configurationError },
       }),
     );
     await page
@@ -210,6 +219,14 @@ test('built UI discovers models, saves multiple choices, scopes blank keys, and 
       .getByRole('alert')
       .filter({ hasText: 'Unable to update model settings' })
       .waitFor();
+    const detailsButton = page.getByRole('button', { name: 'View details', exact: true });
+    await detailsButton.click();
+    assert.equal(await page.getByRole('dialog').locator('pre').innerText(), configurationError);
+    await page.getByRole('dialog').getByRole('button', { name: 'copy', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'copied', exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(await detailsButton.evaluate((el) => el === document.activeElement), true);
     await page.unroute('**/api/config/connections');
     await page
       .getByRole('button', { name: 'Save changes', exact: true })

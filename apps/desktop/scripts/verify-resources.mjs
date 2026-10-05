@@ -36,8 +36,16 @@ try {
   });
   const health = await (await fetch(`${connection.url}/healthz`)).json();
   assert.equal(health.state, 'needs-config');
+  const headers = { authorization: `Bearer ${connection.token}` };
+  const catalog = await (await fetch(`${connection.url}/api/strategies/list`, { headers })).json();
+  const strategy = catalog.strategies.find(s => s.name === 'ma-trail-stop');
+  assert.ok(strategy, 'The packaged strategy must be discoverable');
+  assert.equal(strategy.valid, true, JSON.stringify(strategy.problems));
+  const detail = await (await fetch(`${connection.url}/api/strategies/get?name=ma-trail-stop`, { headers })).json();
+  assert.equal(detail.valid, true, JSON.stringify(detail.problems));
+  assert.equal(detail.params.fast.default, 10);
   const created = await fetch(`${connection.url}/api/sessions`, {
-    method: 'POST', headers: { authorization: `Bearer ${connection.token}` },
+    method: 'POST', headers,
   });
   assert.equal(created.status, 201);
   const exited = new Promise((resolve, reject) => {
@@ -46,7 +54,7 @@ try {
   });
   child.stdin.end();
   await exited;
-  console.log('Packaged Node/core: empty PATH, no checkout, needs-config, session API and stdin shutdown passed');
+  console.log('Packaged Node/core: empty PATH, no checkout, strategy loading, session API and stdin shutdown passed');
 } finally {
   if (child?.exitCode === null) {
     const exited = new Promise(resolve => child.once('exit', resolve));

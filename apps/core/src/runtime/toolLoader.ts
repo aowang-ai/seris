@@ -17,6 +17,7 @@ import { perpWalletTools } from '../tools/perpWallet.js';
 import { browserTools } from '../tools/browser.js';
 import { execTools } from '../tools/exec.js';
 import { marketsTools } from '../tools/markets.js';
+import { strategiesTools } from '../tools/strategies.js';
 
 export function buildRegistry(): ToolRegistry {
   const registry = new ToolRegistry();
@@ -37,6 +38,7 @@ export function buildRegistry(): ToolRegistry {
     ...browserTools,
     ...execTools,
     ...marketsTools,
+    ...strategiesTools,
   ] as HarnessTool[];
   registry.registerAll(all);
   return registry;

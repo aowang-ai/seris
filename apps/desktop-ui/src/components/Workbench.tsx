@@ -43,17 +43,6 @@ export function PlaceholderPanel({
   );
 }
 
-export function StrategiesPanel() {
-  const { t } = useI18n();
-  return (
-    <PlaceholderPanel
-      title={t('Strategies')}
-      blurb={t(
-        'Save and adjust your trading rules and view their performance. This page is under development.',
-      )}
-    />
-  );
-}
 export function AutomationPanel() {
   const { t } = useI18n();
   return (

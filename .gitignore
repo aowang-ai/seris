@@ -13,6 +13,7 @@ apps/desktop/src-tauri/resources/
 .seris-data/
 sessions/
 workspace/
+/skills/
 **/skills/installed/
 
 # Internal development material

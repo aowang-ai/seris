@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Seris",
-  "version": "0.1.0-beta.0",
+  "version": "0.1.0-beta.1",
   "identifier": "im.seris.desktop",
   "build": {
-    "beforeDevCommand": "pnpm --dir ../core build && node scripts/prepare-resources.mjs && pnpm --dir ../desktop-ui dev",
+    "beforeDevCommand": "pnpm --dir ../core build && pnpm --dir ../desktop-ui dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "pnpm --dir ../.. build && node scripts/prepare-resources.mjs",
+    "beforeBuildCommand": "pnpm --dir ../.. build",
     "frontendDist": "../../desktop-ui/dist"
   },
   "app": {

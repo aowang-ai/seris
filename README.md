@@ -4,13 +4,14 @@
 
 Seris connects conversation with a market workspace. Follow crypto, US stocks and ETFs, inspect candlestick charts, and ask an agent to analyze what you are looking at or set a price alert.
 
-**Status: Alpha.** Chat, Markets and model settings are connected. Strategies, Automation and Portfolio pages are prototypes. Trading and wallet tools marked as simulated do not execute real transactions. Alerts run only while the app is running.
+**Status: Beta.** Chat, Markets, model settings and Strategies are connected. Automation and Portfolio pages are prototypes. Trading and wallet tools marked as simulated do not execute real transactions. Alerts run only while the app is running.
 
 ## Features
 
 - **Chat:** persistent conversations, automatic titles, streaming responses and tool approvals.
 - **Markets:** watchlists, search, TradingView candlestick charts, news and conditional alerts. Open Chat alongside a chart and share the current instrument, interval and selected range.
 - **Models:** cloud providers, custom OpenAI/Anthropic-compatible endpoints, and model discovery from running Ollama or LM Studio servers.
+- **Strategies:** review AI-authored TypeScript strategies before saving, backtest against Binance spot candles, and inspect persisted metrics, fills and charts. User strategies survive application upgrades; older drafts are migrated from runtime caches on first launch.
 - **Settings:** English and Chinese interfaces, provider configuration and model selection. Desktop API keys are stored in the operating system credential store.
 
 ## Run locally
@@ -51,6 +52,8 @@ The desktop shell bundles Node and the core runtime. The UI connects to the loca
 ## Local data
 
 Desktop data lives in the system application-data directory. The standalone gateway uses the working directory. Override these with `SERIS_DATA_DIR`; use `SERIS_WORKSPACE` for the agent's task directory. Sessions, state, installed skills and generated artifacts remain local and are excluded from Git. Internal development notes in `docs/` are also excluded.
+
+User strategies live in `skills/strategies/` within that data directory. Strategies can import types and indicator helpers from `@seris/strategy`; legacy relative SDK imports remain supported.
 
 Browser tools require Chrome or `SERIS_BROWSER_PATH`. Approved terminal actions run a full shell under your account; Node permission controls are not an operating system sandbox. Read [Security](SECURITY.md) for details.
 

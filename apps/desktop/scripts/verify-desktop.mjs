@@ -9,9 +9,10 @@ import { randomUUID } from 'node:crypto';
 
 if (process.platform !== 'darwin') throw new Error('This supervisor smoke currently targets the macOS .app bundle');
 const dir = await mkdtemp(join(tmpdir(), 'seris-native-'));
-const executable = fileURLToPath(new URL('../src-tauri/target/release/bundle/macos/Seris.app/Contents/MacOS/seris-desktop', import.meta.url));
+const bundle = process.argv[2] ?? fileURLToPath(new URL('../src-tauri/target/release/bundle/macos/Seris.app', import.meta.url));
+const executable = join(bundle, 'Contents/MacOS/seris-desktop');
 const env = Object.fromEntries(['HOME', 'TMPDIR', 'USER', 'LOGNAME', 'LANG'].filter(k => process.env[k]).map(k => [k, process.env[k]]));
-const child = spawn(executable, [], { env: { ...env, PATH: '', SERIS_DATA_DIR: dir }, stdio: ['ignore', 'ignore', 'pipe'] });
+const child = spawn(executable, [], { env: { ...env, PATH: '', SERIS_DATA_DIR: dir, SERIS_LEGACY_CORE_DIR: join(dir, 'legacy-core') }, stdio: ['ignore', 'ignore', 'pipe'] });
 let logs = '', sidecar;
 const account = `seris-smoke-${randomUUID()}`;
 

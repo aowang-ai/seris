@@ -1,6 +1,6 @@
 # Contributing to Seris
 
-Seris is an early Alpha. Describe the user problem before proposing a large change. Keep contributions focused and reuse existing libraries where appropriate.
+Seris is an early Beta. Describe the user problem before proposing a large change. Keep contributions focused and reuse existing libraries where appropriate.
 
 ## Development
 
@@ -31,7 +31,7 @@ pnpm audit --prod --audit-level high
 Desktop changes also require a native build and resource checks on the target platform:
 
 ```bash
-pnpm -C apps/desktop exec tauri build --bundles app
+pnpm -C apps/desktop run build:app --bundles app
 cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
 node apps/desktop/scripts/verify-resources.mjs
 node apps/desktop/scripts/verify-desktop.mjs # macOS interactive startup and recovery
