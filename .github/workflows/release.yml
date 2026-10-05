@@ -57,13 +57,13 @@ jobs:
         run: |
           set -e
           NOTES_FILE="$RUNNER_TEMP/release-notes.md"
-          cat > "$NOTES_FILE" <<'EOF'
-          See the repository README for feature scope and known limits.
-
-          - Built from tag ${TAG}
-          - macOS arm64 (Apple Silicon) only
-          - **Unsigned**: right-click → Open on first launch, or `xattr -cr` on the installed .app
-          EOF
+          {
+            echo "Seris ${TAG#v}. See the repository README for feature scope and known limits."
+            echo
+            echo "- Built from tag ${TAG}"
+            echo "- macOS arm64 (Apple Silicon) only"
+            echo "- **Unsigned**: right-click → Open on first launch, or \`xattr -cr\` on the installed .app"
+          } > "$NOTES_FILE"
           gh release create "$TAG" "${{ steps.art.outputs.dmg }}" \
             --title "Seris ${TAG#v}" \
             --notes-file "$NOTES_FILE" \
