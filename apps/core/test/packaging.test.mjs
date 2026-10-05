@@ -1,0 +1,52 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, writeFile, readFile, lstat, symlink, link, copyFile, chmod, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { optimizeRuntime, stripAndSign } from '../../desktop/scripts/optimize-runtime.mjs';
+
+test('production archive preserves symlinks, executable modes and hard-linked duplicate payloads', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'seris-packaging-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const stage = join(dir, 'stage');
+  await mkdir(join(stage, 'node_modules/pkg'), { recursive: true });
+  await mkdir(join(stage, 'skills'), { recursive: true });
+  for (const name of ['a.js', 'b.js', 'executable.js']) await writeFile(join(stage, 'node_modules/pkg', name), 'same runtime');
+  await chmod(join(stage, 'node_modules/pkg/executable.js'), 0o755);
+  await writeFile(join(stage, 'node_modules/pkg/types.d.ts'), 'declare const x: number;');
+  await writeFile(join(stage, 'node_modules/pkg/a.js.map'), '{}');
+  await writeFile(join(stage, 'skills/strategy.ts'), 'export default {};');
+  await symlink('pkg', join(stage, 'node_modules/alias'));
+  const stats = await optimizeRuntime(stage, { stripNative: false });
+  assert.equal(stats.prunedFiles, 2);
+  assert.equal(stats.linkedFiles, 1);
+  assert.ok(stats.storedBytes < stats.originalBytes);
+  const archive = join(dir, 'core.tar.gz'), restored = join(dir, 'restored');
+  execFileSync('tar', ['-czf', archive, '-C', stage, '.']);
+  await mkdir(restored);
+  execFileSync('tar', ['-xzf', archive, '-C', restored]);
+  const a = await lstat(join(restored, 'node_modules/pkg/a.js'));
+  const b = await lstat(join(restored, 'node_modules/pkg/b.js'));
+  const exe = await lstat(join(restored, 'node_modules/pkg/executable.js'));
+  assert.equal(a.ino, b.ino);
+  assert.notEqual(a.ino, exe.ino);
+  assert.equal(exe.mode & 0o777, 0o755);
+  assert.equal((await lstat(join(restored, 'node_modules/alias'))).isSymbolicLink(), true);
+  assert.equal(await readFile(join(restored, 'skills/strategy.ts'), 'utf8'), 'export default {};');
+  await assert.rejects(lstat(join(restored, 'node_modules/pkg/types.d.ts')), { code: 'ENOENT' });
+});
+
+test('macOS optimization signs a working Node without modifying a shared store inode', { skip: process.platform !== 'darwin' }, async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'seris-strip-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const store = join(dir, 'store-node'), deployed = join(dir, 'deployed-node');
+  await copyFile(process.execPath, store);
+  const original = await readFile(store);
+  await link(store, deployed);
+  await stripAndSign(deployed);
+  assert.deepEqual(await readFile(store), original);
+  assert.notEqual((await lstat(store)).ino, (await lstat(deployed)).ino);
+  execFileSync('codesign', ['--verify', '--strict', deployed]);
+  assert.equal(execFileSync(deployed, ['-p', 'process.versions.node'], { encoding: 'utf8' }).trim(), process.versions.node);
+});

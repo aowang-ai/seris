@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { mkdtemp, rm, mkdir, cp, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,6 +18,38 @@ try {
   });
   await assert.rejects(access(join(dir, 'core/skills/installed')), { code: 'ENOENT' });
   const node = join(dir, 'resources/runtime', process.platform === 'win32' ? 'node.exe' : 'node');
+  if (process.platform === 'darwin') execFileSync('codesign', ['--verify', '--strict', node]);
+  // Exercise the stripped native addon, esbuild and document dependencies from
+  // the extracted deployment, without resolving anything from the checkout.
+  execFileSync(node, ['--input-type=module', '--eval', `
+    import assert from 'node:assert/strict';
+    import { readFile } from 'node:fs/promises';
+    import { Decimal, QuoteContext, OAuth } from 'longbridge';
+    import { transform } from 'esbuild';
+    import { chromium } from 'playwright-core';
+    import { pdfCreateTool } from './dist/tools/artifact/pdf.js';
+    import { docxCreateTool } from './dist/tools/artifact/docx.js';
+    import { xlsxCreateTool, xlsxToCsvTool } from './dist/tools/artifact/xlsx.js';
+    import { pptxCreateTool } from './dist/tools/artifact/pptx.js';
+    assert.equal(new Decimal('12.34').toString(), '12.34');
+    assert.equal(typeof QuoteContext, 'function');
+    assert.equal(typeof OAuth, 'function');
+    assert.equal(typeof chromium.connectOverCDP, 'function');
+    assert.ok((await transform('const n: number = 3', { loader: 'ts' })).code.includes('3'));
+    const specs = [
+      [pdfCreateTool, { filename: 'test.pdf', pages: [{ paragraphs: ['Packaged runtime'] }] }, '%PDF'],
+      [docxCreateTool, { filename: 'test.docx', sections: [{ paragraphs: ['Packaged runtime'] }] }, 'PK'],
+      [xlsxCreateTool, { filename: 'test.xlsx', sheets: { Data: [['Price'], [12.34]] } }, 'PK'],
+      [pptxCreateTool, { filename: 'test.pptx', slides: [{ title: 'Packaged runtime' }] }, 'PK'],
+    ];
+    for (const [tool, args, prefix] of specs) {
+      const result = (await tool.execute('distribution-test', args)).details;
+      assert.equal(result.real, true, JSON.stringify(result));
+      assert.equal((await readFile(result.path)).subarray(0, prefix.length).toString(), prefix);
+      if (args.filename.endsWith('.xlsx')) assert.equal((await xlsxToCsvTool.execute('distribution-test', { path: result.path })).details.csv, 'Price\\n12.34');
+    }
+    console.log('Packaged native SDK, strategy compiler, browser library and PDF/Word/Excel/PowerPoint passed');
+  `], { cwd: join(dir, 'core'), env: { PATH: '', SERIS_ARTIFACTS_DIR: join(dir, 'artifacts') }, stdio: 'inherit' });
   child = spawn(node, [join(dir, 'core/dist/gateway/server.js')], {
     cwd: dir, env: { PATH: '', SERIS_DATA_DIR: join(dir, 'data'), SERIS_MANAGED: '1', SERIS_PORT: '0' },
     stdio: ['pipe', 'pipe', 'pipe'],

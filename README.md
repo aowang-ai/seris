@@ -6,6 +6,10 @@ Seris connects conversation with a market workspace. Follow crypto, US stocks an
 
 **Status: Beta.** Chat, Markets, model settings and Strategies are connected. Automation and Portfolio pages are prototypes. Trading and wallet tools marked as simulated do not execute real transactions. Alerts run only while the app is running.
 
+## Install the Beta
+
+Download the Apple Silicon DMG from [Releases](https://github.com/aowang-ai/seris/releases). Open it and drag Seris to Applications. The Beta uses a complete ad-hoc signature and is not Apple-notarized. After the first blocked launch, go to **System Settings → Privacy & Security → Open Anyway** and approve Seris. See [Apple's instructions](https://support.apple.com/102445). A keychain prompt may also ask you to authorize access to an existing model credential after an upgrade.
+
 ## Features
 
 - **Chat:** persistent conversations, automatic titles, streaming responses and tool approvals.

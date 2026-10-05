@@ -47,3 +47,4 @@ jobs:
       - run: pnpm -C apps/desktop run build:app --bundles app
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
       - run: node apps/desktop/scripts/verify-resources.mjs
+      - run: node apps/desktop/scripts/verify-desktop.mjs

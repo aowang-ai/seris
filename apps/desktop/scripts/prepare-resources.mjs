@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { optimizeRuntime, stripAndSign } from './optimize-runtime.mjs';
 const repo=fileURLToPath(new URL('../../../',import.meta.url));
 const resources=join(repo,'apps/desktop/src-tauri/resources');
 const stage=join(resources,'staging-core');
@@ -17,10 +18,13 @@ if(!rustTarget)throw new Error('Unable to determine the Rust target.');
 execFileSync('pnpm',['--filter','@seris/core','deploy','--prod','--ignore-scripts',stage],{cwd:repo,stdio:'inherit'});
 // Never distribute user-installed skills, even when packaging a development checkout.
 await rm(join(stage,'skills/installed'),{recursive:true,force:true});
-// A portable dependency tree includes symlinks. Archive it intact for all bundle formats.
+const optimized = await optimizeRuntime(stage);
+console.log(`Optimized core: ${(optimized.originalBytes/2**20).toFixed(1)} → ${(optimized.storedBytes/2**20).toFixed(1)} MiB; ${optimized.prunedFiles} development files removed, ${optimized.strippedFiles} native binaries stripped, ${optimized.linkedFiles} duplicates hard-linked`);
+// Preserve symlinks and hardlinks; tar stores identical payloads only once.
 execFileSync('tar',['-czf',join(resources,'core.tar.gz'),'-C',stage,'.'],{stdio:'inherit'});
 await cp(process.execPath,join(resources,'runtime',process.platform==='win32'?'node.exe':'node'));
 await chmod(join(resources,'runtime',process.platform==='win32'?'node.exe':'node'),0o755);
+if (process.platform === 'darwin') await stripAndSign(join(resources,'runtime/node'));
 const id=createHash('sha256').update(await readFile(join(resources,'core.tar.gz'))).digest('hex').slice(0,16);
 await writeFile(join(resources,'manifest.json'),JSON.stringify({id,node:process.versions.node,platform:process.platform,arch:process.arch}));
 await rm(stage,{recursive:true,force:true});

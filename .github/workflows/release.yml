@@ -28,6 +28,7 @@ jobs:
             ~/.cargo/git
             apps/desktop/src-tauri/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
 
       - name: Check release version
         env:
@@ -44,13 +45,17 @@ jobs:
 
       - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
       - run: node apps/desktop/scripts/verify-resources.mjs
+      - run: node apps/desktop/scripts/verify-desktop.mjs
 
       - name: Resolve artifact paths
         id: art
         run: |
           set -e
-          DMG=$(ls apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg | head -1)
-          APP=$(ls -d apps/desktop/src-tauri/target/release/bundle/macos/*.app | head -1)
+          VERSION=$(node -p 'require("./package.json").version')
+          DMG="apps/desktop/src-tauri/target/release/bundle/dmg/Seris_${VERSION}_aarch64.dmg"
+          APP="apps/desktop/src-tauri/target/release/bundle/macos/Seris.app"
+          test -f "$DMG"
+          test -d "$APP"
           echo "dmg=$DMG" >> "$GITHUB_OUTPUT"
           echo "app=$APP" >> "$GITHUB_OUTPUT"
           echo "dmg_name=$(basename "$DMG")" >> "$GITHUB_OUTPUT"
@@ -70,7 +75,7 @@ jobs:
             echo
             echo "- Built from tag ${TAG}"
             echo "- macOS arm64 (Apple Silicon) only"
-            echo "- **Unsigned**: right-click → Open on first launch, or \`xattr -cr\` on the installed .app"
+            echo "- Ad-hoc signed, not notarized: after the first blocked launch, approve Seris in System Settings → Privacy & Security → Open Anyway."
           } > "$NOTES_FILE"
           fi
           gh release create "$TAG" "${{ steps.art.outputs.dmg }}" \
