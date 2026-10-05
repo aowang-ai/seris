@@ -1,6 +1,6 @@
 {
   "name": "seris",
-  "version": "0.1.0",
+  "version": "0.1.0-beta.0",
   "private": true,
   "type": "module",
   "description": "Seris desktop trading assistant.",
