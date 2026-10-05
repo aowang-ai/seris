@@ -1456,9 +1456,13 @@ button:disabled {
   background: var(--secondary);
 }
 .market-search-select {
-  display: block;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-content: center;
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 5px;
   width: 100%;
-  height: 100%;
   padding: 9px 12px;
   text-align: left;
   border-radius: 6px;
@@ -1466,17 +1470,19 @@ button:disabled {
 .market-search-select strong {
   font-size: 13px;
   font-weight: 500;
-  margin-right: 10px;
 }
 .market-search-select span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted-foreground);
   font-size: 11px;
 }
 .market-search-select small {
-  display: block;
+  grid-column: 1 / -1;
   font-size: 10px;
   color: var(--muted-foreground);
-  margin-top: 5px;
 }
 .market-search-stars button {
   display: block;

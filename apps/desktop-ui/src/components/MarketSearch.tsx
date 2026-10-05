@@ -52,6 +52,7 @@ function SearchContent({
   const [index, setIndex] = useState(0);
   const [pending, setPending] = useState<string>();
   const toggling = useRef(false);
+  const composing = useRef(false);
   useEffect(() => {
     let alive = true;
     const text = query.trim();
@@ -115,7 +116,11 @@ function SearchContent({
         placeholder={t('Search symbol or name, e.g. BTC, NVDA, SPY')}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onCompositionStart={() => { composing.current = true; }}
+        onCompositionEnd={() => { composing.current = false; }}
+        onBlur={() => { composing.current = false; }}
         onKeyDown={(e) => {
+          if (composing.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
           if (['ArrowDown', 'ArrowUp'].includes(e.key)) {
             e.preventDefault();
             setIndex((v) =>
@@ -173,7 +178,7 @@ function SearchContent({
               onFocus={() => setIndex(n)}
             >
               <strong>{i.symbol}</strong>
-              <span>{instrumentName(i, language)}</span>
+              <span title={instrumentName(i, language)}>{instrumentName(i, language)}</span>
               <small>{venue(i, language)}</small>
             </button>
           ))}
