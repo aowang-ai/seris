@@ -40,7 +40,6 @@
     "resources": {
       "resources/core.tar.gz": "core.tar.gz",
       "resources/runtime/": "runtime/",
-      "resources/licenses/": "licenses/",
       "resources/manifest.json": "manifest.json"
     }
   }
