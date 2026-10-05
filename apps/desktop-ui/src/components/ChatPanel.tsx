@@ -76,6 +76,7 @@ function ToolResult({ message: m }: { message: HistoryEntry }) {
 export function ChatPanel(p: ChatPanelProps) {
   const { t, language, locale } = useI18n();
   const log = useRef<HTMLDivElement>(null);
+  const composing = useRef(false);
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight });
   }, [p.messages]);
@@ -189,7 +190,7 @@ export function ChatPanel(p: ChatPanelProps) {
         className="chat-compose"
         onSubmit={(e) => {
           e.preventDefault();
-          p.onSend();
+          if (!composing.current) p.onSend();
         }}
       >
         {p.context && (
@@ -217,6 +218,16 @@ export function ChatPanel(p: ChatPanelProps) {
             aria-label={t('Message')}
             value={p.draft}
             onChange={(e) => p.onDraft(e.target.value)}
+            onCompositionStart={() => { composing.current = true; }}
+            onCompositionEnd={() => { composing.current = false; }}
+            onBlur={() => { composing.current = false; }}
+            onKeyDown={(e) => {
+              // WebKit can end composition before this keydown and report
+              // isComposing=false. keyCode 229 still identifies the IME key.
+              if (e.key === 'Enter' && (composing.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229)) {
+                e.preventDefault();
+              }
+            }}
             placeholder={
               !p.ready
                 ? t('Configure the model to begin…')

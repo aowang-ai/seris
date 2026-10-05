@@ -105,14 +105,27 @@ export function ModelPicker({
         }
         className={
           compact
-            ? 'flex max-w-[240px] items-center gap-1.5 truncate text-[11px] outline-none'
+            ? 'flex min-w-0 max-w-[240px] items-center gap-1.5 text-[11px] outline-none'
             : 'flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-[13px] outline-none focus-visible:border-ring'
         }
       >
-        <span className="truncate">
+        <span className="min-w-0 truncate">
           {selected?.model.name ?? t('Choose a model')}
         </span>
-        <span aria-hidden="true">⌄</span>
+        <svg
+          className="shrink-0"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </Combobox.Trigger>
       <Combobox.Portal>
         <Combobox.Positioner
