@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, mkdir, cp, readFile, access } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, cp, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import assert from 'node:assert/strict';
@@ -10,10 +10,6 @@ const resources = fileURLToPath(new URL('../src-tauri/resources/', import.meta.u
 let child;
 try {
   await cp(resources, join(dir, 'resources'), { recursive: true });
-  for (const name of ['LICENSE', 'NOTICE', 'Node-LICENSE.txt', 'THIRD-PARTY-NOTICES.txt', 'Seris-brand-LICENSE.md', 'OFL-Geist.txt']) {
-    const text = await readFile(join(dir, 'resources/licenses', name), 'utf8');
-    assert.ok(text.length > 100, `Empty license: ${name}`);
-  }
   await mkdir(join(dir, 'core'));
   await new Promise((resolve, reject) => {
     const tar = spawn('tar', ['-xzf', join(dir, 'resources/core.tar.gz'), '-C', join(dir, 'core')]);

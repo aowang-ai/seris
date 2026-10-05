@@ -45,7 +45,6 @@ Market views report missing data rather than inventing quotes or company informa
 | `apps/core` | pi 1.0.2 agent runtime, gateway, tools, skills and persistent sessions |
 | `apps/desktop-ui` | React / Vite / Tailwind interface |
 | `apps/desktop` | Tauri / Rust shell, process supervision and desktop packaging |
-| `licenses/upstream` | Supplemental third-party license texts used during packaging |
 
 The desktop shell bundles Node and the core runtime. The UI connects to the local gateway over HTTP and SSE; `apps/core/src/protocol.ts` defines their shared protocol.
 
@@ -57,4 +56,4 @@ Browser tools require Chrome or `SERIS_BROWSER_PATH`. Approved terminal actions 
 
 ## License
 
-Project-owned code and public documentation use [Apache-2.0](LICENSE). Seris branding has [separate terms](apps/desktop-ui/public/brand/LICENSE.md). Fonts and dependencies retain their own licenses; see [Third-party software](THIRD-PARTY.md).
+Project-owned code and public documentation use [Apache-2.0](LICENSE). Seris branding has [separate terms](apps/desktop-ui/public/brand/LICENSE.md). Dependencies retain their own licenses.

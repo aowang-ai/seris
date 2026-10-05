@@ -43,6 +43,6 @@ Optional live model checks use `pnpm core:smoke` and `pnpm core:smoke:gateway`. 
 
 Issues should include the operating system, app version, reproduction steps and expected behavior. Remove API keys, account details and private conversations from logs and screenshots. Report vulnerabilities as described in [Security](SECURITY.md).
 
-Preserve upstream licenses and notices when importing code or assets. Record the source, version, license and modifications in your pull request, and update [third-party notices](THIRD-PARTY.md) where needed. Do not contribute proprietary code, prompts or skill instructions without redistribution rights.
+Preserve upstream licenses and notices when importing code or assets. Record the source, version, license and modifications in your pull request. Do not contribute proprietary code, prompts or skill instructions without redistribution rights.
 
 Contributions use the [project license](LICENSE). Seris branding has the separate terms in [the brand license](apps/desktop-ui/public/brand/LICENSE.md).
