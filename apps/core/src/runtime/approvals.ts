@@ -30,6 +30,6 @@ export class Approvals {
 }
 const GATED = new Set([
   'terminal', 'execute_code', 'computer', 'browser_click', 'browser_type', 'browser_navigate', 'browser_back',
-  'brokerage_order_submit', 'brokerage_order_cancel', 'seris_wallet_fund_perp', 'seris_wallet_withdraw_to_spot', 'install_skill', 'uninstall_skill',
+  'brokerage_order_submit', 'brokerage_order_cancel', 'seris_wallet_fund_perp', 'seris_wallet_withdraw_to_spot',
 ]);
 export function requiresApproval(name: string): boolean { return GATED.has(name); }

@@ -190,12 +190,11 @@ test('UI alone decides proactive approvals and stale plan approvals fail closed'
 test('pending tools survive snapshot while awaiting approval',async t=>{
  const tools=new ToolRegistry().register(defineTool({name:'terminal',category:'workspace',description:'fixture',parameters:{type:'object',properties:{}},execute:()=>({ok:true})}));const {runtime}=await fixture(t,[toolCall('terminal')],tools);const s=await runtime.createSession();const run=runtime.startPrompt(s.id,'Wait',{requestId:'snapshot-001'});await eventually(()=>runtime.approvals.list().length===1);const snapshot=await runtime.snapshot(s.id,()=>({epoch:'fixture',seq:1}));assert.equal(snapshot.messages.find(m=>m.role==='tool').pending,true);assert.equal(snapshot.messages.find(m=>m.role==='tool').toolCallId,'call-1');run.abort();await run.done;
 });
-test('skill uninstall rejects traversal and reload updates the actual composition root',async t=>{
- const {dir}=await fixture(t);const {getBootstrapRegistry}=await import('../dist/bootstrap/registry.js');const {installSkillTool,reloadCapabilitiesTool}=await import('../dist/tools/bootstrap.js');const registry=getBootstrapRegistry(join(dir,'skills'));await assert.rejects(registry.uninstall('../..'),/Invalid skill name/);
+test('load_skill reads a bundled skill body',async t=>{
+ const {dir}=await fixture(t);
  const runtime=await createSerisRuntime({sessionsRoot:join(dir,'skill-sessions')});t.after(()=>runtime.dispose());
- const found=await registry.search('');assert.ok(found.length);const installed=await installSkillTool.execute('install',{source:found[0].name});assert.equal(installed.details.installed,true);await reloadCapabilitiesTool.execute('reload',{});
- // Use the registry owned by the live runtime, rather than a new scanner.
- const loaded=await runtime.deps.tools.get('load_skill').execute('load',{name:found[0].name});assert.ok(loaded.details.instructions.length>0);
+ const catalog=runtime.deps.skills.catalog();assert.ok(catalog.length>0);
+ const loaded=await runtime.deps.tools.get('load_skill').execute('load',{name:catalog[0].name});assert.ok(loaded.details.instructions.length>0);
 });
 
 test('browser contexts are owned by sessions and cancellation affects only its page',async t=>{

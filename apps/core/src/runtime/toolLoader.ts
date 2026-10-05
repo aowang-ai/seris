@@ -10,8 +10,6 @@ import { onchainMarketTools } from '../tools/onchain-market.js';
 import { allArtifactTools } from '../tools/artifact/index.js';
 import { autopilotTools } from '../tools/autopilot.js';
 import { proactiveTools } from '../tools/proactive.js';
-import { bootstrapTools } from '../tools/bootstrap.js';
-import { benchmarkTools } from '../tools/benchmark.js';
 import { accountTools } from '../tools/account.js';
 import { brokerageTools } from '../tools/brokerage.js';
 import { memoryTools } from '../tools/memory.js';
@@ -32,8 +30,6 @@ export function buildRegistry(): ToolRegistry {
     ...allArtifactTools,
     ...autopilotTools,
     ...proactiveTools,
-    ...bootstrapTools,
-    ...benchmarkTools,
     ...accountTools,
     ...brokerageTools,
     ...memoryTools,

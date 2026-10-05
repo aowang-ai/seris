@@ -26,7 +26,8 @@
     "pdf-lib": "^1.17.1",
     "playwright-core": "^1.50.1",
     "pptxgenjs": "^4.0.1",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "yaml": "2.9.0"
   },
   "files": [
     "dist",
