@@ -515,6 +515,7 @@ export function App() {
     }
   }, [restore]);
   const send = useCallback(async () => {
+    const submittedDraft = draft;
     const text = draft.trim();
     if (!text || busy) return;
     const sendingKey = currentId ?? 'new';
@@ -540,6 +541,10 @@ export function App() {
         const s = await seris.createSession();
         sid = s.id;
         setSessions((p) => [s, ...p]);
+        // Keep the first request busy after the composer switches from the
+        // unsaved draft to its new session, and carry any text typed meanwhile.
+        setSending((p) => ({ ...p, [s.id]: true }));
+        setDrafts((d) => ({ ...d, [s.id]: d[sendingKey] ?? submittedDraft }));
         setCurrentId(sid);
         currentRef.current = sid;
         await restore(sid);
@@ -551,7 +556,15 @@ export function App() {
       request.current[sid] = pending;
       const result = await seris.prompt(sid, text, pending.id, pending.context);
       delete request.current[sid];
-      setDrafts((d) => ({ ...d, [currentId ?? 'new']: '', [sid!]: '' }));
+      // A delayed receipt belongs to the submitted draft, not to text typed
+      // while the request was in flight or to a newly selected session.
+      setDrafts((d) => {
+        const next = { ...d };
+        for (const key of new Set([sendingKey, sid!])) {
+          if (d[key] === submittedDraft) next[key] = '';
+        }
+        return next;
+      });
       setRuns((r) =>
         r[sid!]?.id === result.runId
           ? r
@@ -573,6 +586,7 @@ export function App() {
       setSending((s) => {
         const next = { ...s };
         delete next[sendingKey];
+        if (sid) delete next[sid];
         return next;
       });
     }

@@ -733,6 +733,7 @@ test('ordinary Chat opens Markets only for typed view actions and keeps its conv
   );
   const gateway = await startGateway({ runtime, markets: service, staticRoot });
   t.after(() => gateway.close());
+  const firstReceipt = deferred();
   let browser;
   try {
     try {
@@ -753,6 +754,11 @@ test('ordinary Chat opens Markets only for typed view actions and keeps its conv
       locale: 'zh-CN',
       viewport: { width: 1280, height: 840 },
     });
+    await page.route('**/api/sessions/*/prompt', async (route) => {
+      const response = await route.fetch();
+      await firstReceipt.promise;
+      await route.fulfill({ response });
+    }, { times: 1 });
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto(gateway.launchUrl);
@@ -772,6 +778,17 @@ test('ordinary Chat opens Markets only for typed view actions and keeps its conv
     await page
       .getByLabel('消息', { exact: true })
       .fill('Show NVDA then BTC weekly');
+    assert.equal(
+      await page.getByRole('button', { name: '发送 ↑', exact: true }).isDisabled(),
+      true,
+      'a newly created session stays busy until the first receipt is restored',
+    );
+    firstReceipt.resolve();
+    await until(async () =>
+      await page.getByRole('button', { name: '停止', exact: true }).count() === 0,
+    );
+    assert.equal(await page.getByLabel('消息', { exact: true }).inputValue(),
+      'Show NVDA then BTC weekly');
     await page.getByRole('button', { name: '发送 ↑', exact: true }).click();
     await page.getByRole('region', { name: '市场对话', exact: true }).waitFor();
     await page.getByLabel('BTC K 线图', { exact: true }).waitFor();
@@ -847,6 +864,7 @@ test('ordinary Chat opens Markets only for typed view actions and keeps its conv
     );
     assert.deepEqual(errors, []);
   } finally {
+    firstReceipt.resolve();
     wait.resolve();
     tabWait.resolve();
     await browser?.close();
@@ -874,11 +892,19 @@ test('language preference translates all workspaces and Markets dialogs without 
       ? { executablePath: process.env.SERIS_BROWSER_PATH }
       : { channel: 'chrome' }),
   });
+  const promptReceipt = deferred();
   try {
     const page = await browser.newPage({
       locale: 'zh-CN',
       viewport: { width: 1440, height: 900 },
     });
+    // Let the run complete before its HTTP receipt reaches the composer. The
+    // user must be able to type the next message without that receipt erasing it.
+    await page.route('**/api/sessions/*/prompt', async (route) => {
+      const response = await route.fetch();
+      await promptReceipt.promise;
+      await route.fulfill({ response });
+    }, { times: 1 });
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto(gateway.launchUrl);
@@ -922,6 +948,15 @@ test('language preference translates all workspaces and Markets dialogs without 
     await page
       .getByLabel('消息', { exact: true })
       .fill('Keep this draft / 保留草稿');
+    promptReceipt.resolve();
+    await until(async () =>
+      await page.getByRole('button', { name: '停止', exact: true }).count() === 0,
+    );
+    assert.equal(
+      await page.getByLabel('消息', { exact: true }).inputValue(),
+      'Keep this draft / 保留草稿',
+      'a late receipt must preserve the next draft',
+    );
     await page
       .locator('.market-chart canvas')
       .first()
@@ -1079,6 +1114,7 @@ test('language preference translates all workspaces and Markets dialogs without 
     await page.screenshot({ path: '/tmp/seris-settings-zh.png' });
     assert.deepEqual(errors, []);
   } finally {
+    promptReceipt.resolve();
     await browser.close();
   }
 });
