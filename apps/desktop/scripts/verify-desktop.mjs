@@ -6,10 +6,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { realpathSync } from 'node:fs';
 
 if (process.platform !== 'darwin') throw new Error('This supervisor smoke currently targets the macOS .app bundle');
 const dir = await mkdtemp(join(tmpdir(), 'seris-native-'));
-const bundle = process.argv[2] ?? fileURLToPath(new URL('../src-tauri/target/release/bundle/macos/Seris.app', import.meta.url));
+const bundle = realpathSync(process.argv[2] ?? fileURLToPath(new URL('../src-tauri/target/release/bundle/macos/Seris.app', import.meta.url)));
 const executable = join(bundle, 'Contents/MacOS/seris-desktop');
 const env = Object.fromEntries(['HOME', 'TMPDIR', 'USER', 'LOGNAME', 'LANG'].filter(k => process.env[k]).map(k => [k, process.env[k]]));
 const child = spawn(executable, [], { env: { ...env, PATH: '', SERIS_DATA_DIR: dir, SERIS_LEGACY_CORE_DIR: join(dir, 'legacy-core') }, stdio: ['ignore', 'ignore', 'pipe'] });
@@ -30,7 +31,9 @@ const port = pid => {
   } catch { return null; }
 };
 const eventually = async fn => {
-  for (let i = 0; i < 300; i++) { const value = await fn(); if (value) return value; await new Promise(r => setTimeout(r, 100)); }
+  // First launch unpacks the bundled core before the gateway's own readiness
+  // timer starts. Include that cold-cache work in this external smoke budget.
+  for (let i = 0; i < 900; i++) { const value = await fn(); if (value) return value; await new Promise(r => setTimeout(r, 100)); }
   throw new Error(`Native supervisor timeout: ${logs}`);
 };
 const kill = (pid, signal = 'SIGKILL') => { if (pid) { try { process.kill(pid, signal); } catch {} } };

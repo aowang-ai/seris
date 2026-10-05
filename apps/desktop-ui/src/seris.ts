@@ -10,7 +10,7 @@ import type {
   MarketNews,
 } from '../../core/src/markets/types';
 import { PROTOCOL_VERSION, isModelConfig, isChatEvent, isCursor, isSnapshot, type ChatEvent, type Cursor, type SessionMeta, type SessionSnapshot, type ModelConfig, type ModelConnectionInput, type ModelSelection, type ProviderInfo, type ModelDiscovery, type LocalModelService } from '../../core/src/protocol';
-import type { BacktestRunSummary } from '../../core/src/strategy/store';
+import type { BacktestRunSummary } from '../../core/src/strategy/types';
 import type { BacktestResult } from '../../core/src/strategy/runner';
 export type { SessionMeta, HistoryEntry, RunRecord, ApprovalRequest, ModelConfig, ModelConnectionInput, ModelSelection, ProviderInfo, ConnectionStatus, ModelOption, LocalModelService } from '../../core/src/protocol';
 export type { BacktestRunSummary };

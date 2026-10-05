@@ -1,3 +1,5 @@
+import type { BacktestMetrics } from './runner.js';
+
 /**
  * strategy/types.ts — pure-function strategy contract.
  *
@@ -130,4 +132,34 @@ export interface Strategy {
    * Must not mutate `candles` or `ctx`.
    */
   onCandle(candles: Candle[], ctx: Context, params: ParamValues): Signal;
+}
+
+/** Persisted result metadata shared by the gateway and browser UI. */
+export interface BacktestRunSummary {
+  id: string;
+  strategyName: string;
+  symbol: string;
+  interval: Timeframe;
+  params: ParamValues;
+  initialCash: number;
+  finalEquity: number;
+  candles: number;
+  metrics: BacktestMetrics;
+  startedAt: number;
+  endedAt: number;
+  /**
+   * Short hash over (strategyName, symbol, interval, params, canonical metrics).
+   * Lets a downstream report cite "this Sharpe came from run rb_xxx" and have
+   * a cheap check that another summary referring to the same inputs/metrics
+   * resolves to the same underlying run.
+   */
+  metricsHash: string;
+  /**
+   * Inclusive time range of the candles the run consumed, ms epoch UTC.
+   * Used to sanity-check that a report citing this run isn't extrapolating
+   * outside the observed window.
+   */
+  dataRange: { from: number; to: number };
+  /** Fills and equity are in the sibling detail file. */
+  detailPath: string;
 }

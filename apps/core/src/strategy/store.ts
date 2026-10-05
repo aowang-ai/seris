@@ -15,37 +15,10 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { dataPath } from '../runtime/paths.js';
-import type { BacktestResult, BacktestMetrics } from './runner.js';
-import type { ParamValues, Timeframe } from './types.js';
+import type { BacktestResult } from './runner.js';
+import type { BacktestRunSummary } from './types.js';
 
-export interface BacktestRunSummary {
-  id: string;
-  strategyName: string;
-  symbol: string;
-  interval: Timeframe;
-  params: ParamValues;
-  initialCash: number;
-  finalEquity: number;
-  candles: number;
-  metrics: BacktestMetrics;
-  startedAt: number;
-  endedAt: number;
-  /**
-   * Short hash over (strategyName, symbol, interval, params, canonical metrics).
-   * Lets a downstream report cite "this Sharpe came from run rb_xxx" and have
-   * a cheap check that another summary referring to the same inputs/metrics
-   * resolves to the same underlying run.
-   */
-  metricsHash: string;
-  /**
-   * Inclusive time range of the candles the run consumed, ms epoch UTC.
-   * Used to sanity-check that a report citing this run isn't extrapolating
-   * outside the observed window.
-   */
-  dataRange: { from: number; to: number };
-  /** Fills and equity are in the sibling detail file. */
-  detailPath: string;
-}
+export type { BacktestRunSummary } from './types.js';
 
 function runsDir(): string {
   return dataPath('backtests');
