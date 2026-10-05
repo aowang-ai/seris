@@ -1,0 +1,242 @@
+[
+  {
+    "ecosystem": "npm",
+    "name": "@earendil-works/chord",
+    "version": "1.0.2",
+    "files": [
+      "pi-1.0.2.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@earendil-works/pi-agent-core",
+    "version": "1.0.2",
+    "files": [
+      "pi-1.0.2.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@earendil-works/pi-ai",
+    "version": "1.0.2",
+    "files": [
+      "pi-1.0.2.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@earendil-works/pi-durable",
+    "version": "1.0.2",
+    "files": [
+      "pi-1.0.2.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@earendil-works/pi-telemetry",
+    "version": "1.0.2",
+    "files": [
+      "pi-1.0.2.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "longbridge",
+    "version": "5.2.0",
+    "files": [
+      "longbridge-5.2.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "prefix": "longbridge-",
+    "version": "5.2.0",
+    "files": [
+      "longbridge-5.2.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "prefix": "@esbuild/",
+    "version": "0.28.2",
+    "files": [
+      "esbuild-0.28.2.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "fancy-canvas",
+    "version": "2.1.0",
+    "files": [
+      "fancy-canvas-2.1.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "proxy-agent-negotiate",
+    "version": "1.1.0",
+    "files": [
+      "proxy-agent-negotiate-1.1.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "standardwebhooks",
+    "version": "1.1.1",
+    "files": [
+      "standardwebhooks-1.1.1.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "alloc-stdlib",
+    "version": "0.3.0",
+    "files": [
+      "alloc-stdlib-0.3.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "selectors",
+    "version": "0.38.0",
+    "files": [
+      "MPL-2.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "defmt-parser",
+    "version": "1.0.0",
+    "files": [
+      "Apache-2.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "tauri-plugin",
+    "version": "2.7.1",
+    "files": [
+      "Apache-2.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@aws-sdk/credential-provider-http",
+    "version": "3.972.74",
+    "files": [
+      "Apache-2.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@aws-sdk/credential-provider-login",
+    "version": "3.972.79",
+    "files": [
+      "Apache-2.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "npm",
+    "name": "@aws-sdk/nested-clients",
+    "version": "3.997.46",
+    "files": [
+      "Apache-2.0.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "block2",
+    "version": "0.6.2",
+    "files": [
+      "objc2-b4167b58.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "dispatch2",
+    "version": "0.3.1",
+    "files": [
+      "objc2-8852b424.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "objc2",
+    "version": "0.6.4",
+    "files": [
+      "objc2-8852b424.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "objc2-encode",
+    "version": "4.1.0",
+    "files": [
+      "objc2-8d214f54.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "objc2-exception-helper",
+    "version": "0.1.1",
+    "files": [
+      "objc2-8d214f54.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "objc2-app-kit",
+    "version": "0.3.2",
+    "files": [
+      "objc2-7b1abfd7.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "objc2-core-foundation",
+    "version": "0.3.2",
+    "files": [
+      "objc2-7b1abfd7.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "objc2-core-graphics",
+    "version": "0.3.2",
+    "files": [
+      "objc2-7b1abfd7.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "objc2-foundation",
+    "version": "0.3.2",
+    "files": [
+      "objc2-7b1abfd7.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "objc2-io-surface",
+    "version": "0.3.2",
+    "files": [
+      "objc2-7b1abfd7.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "objc2-quartz-core",
+    "version": "0.3.2",
+    "files": [
+      "objc2-7b1abfd7.txt"
+    ]
+  },
+  {
+    "ecosystem": "Rust",
+    "name": "objc2-web-kit",
+    "version": "0.3.2",
+    "files": [
+      "objc2-7b1abfd7.txt"
+    ]
+  }
+]

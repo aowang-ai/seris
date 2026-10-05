@@ -1,0 +1,26 @@
+{
+  "name": "seris",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Seris desktop trading assistant.",
+  "scripts": {
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "core:gateway": "node apps/core/dist/gateway/server.js",
+    "core:smoke": "node apps/core/dist/smoke-seris.js",
+    "core:smoke:gateway": "node apps/core/dist/smoke-gateway.js",
+    "ui:dev": "pnpm -C apps/desktop-ui dev",
+    "tauri:dev": "pnpm -C apps/desktop run dev",
+    "tauri:build": "pnpm -C apps/desktop run build:app",
+    "test": "pnpm build && node --test apps/core/test/*.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "packageManager": "pnpm@12.5.1",
+  "license": "Apache-2.0"
+}

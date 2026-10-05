@@ -1,0 +1,24 @@
+packages:
+  - "apps/*"
+allowBuilds:
+  '@google/genai': false
+  esbuild: true
+  protobufjs: false
+minimumReleaseAgeExclude:
+  - longbridge-darwin-arm64@5.2.0
+  - longbridge-darwin-x64@5.2.0
+  - longbridge-linux-arm64-gnu@5.2.0
+  - longbridge-linux-x64-gnu@5.2.0
+  - longbridge-win32-x64-msvc@5.2.0
+  - longbridge@5.2.0
+  - '@earendil-works/chord@1.0.2'
+  - '@earendil-works/pi-agent-core@1.0.2'
+  - '@earendil-works/pi-ai@1.0.2'
+  - '@earendil-works/pi-durable@1.0.2'
+  - '@earendil-works/pi-telemetry@1.0.2'
+
+# pptxgenjs accepts image buffers; patched image-size preserves that API.
+overrides:
+  image-size: 2.0.3
+  # Node provides https itself; pptxgenjs's empty npm package is unnecessary.
+  'pptxgenjs>https': '-'

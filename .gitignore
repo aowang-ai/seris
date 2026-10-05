@@ -1,0 +1,24 @@
+# Dependencies and build output
+node_modules/
+dist/
+target/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/resources/
+
+# Credentials and local runtime data
+.env
+.env.*
+!.env.example
+.data/
+.seris-data/
+sessions/
+workspace/
+**/skills/installed/
+
+# Internal development material
+/docs/
+.recon/
+
+# Machine-specific files
+*.log
+.DS_Store

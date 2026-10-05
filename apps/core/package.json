@@ -1,0 +1,37 @@
+{
+  "name": "@seris/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Seris agent runtime, local gateway, market tools and skills.",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
+    "gateway": "node dist/gateway/server.js",
+    "smoke": "node dist/smoke-seris.js",
+    "smoke:gateway": "node dist/smoke-gateway.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "@earendil-works/chord": "1.0.2",
+    "@earendil-works/pi-agent-core": "1.0.2",
+    "@earendil-works/pi-ai": "1.0.2",
+    "@earendil-works/pi-durable": "1.0.2",
+    "cron-parser": "^5.10.1",
+    "docx": "^9.8.0",
+    "longbridge": "5.2.0",
+    "pdf-lib": "^1.17.1",
+    "playwright-core": "^1.50.1",
+    "pptxgenjs": "^4.0.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "package.json"
+  ],
+  "license": "Apache-2.0"
+}
