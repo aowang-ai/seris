@@ -57,6 +57,8 @@ const ICONS: Record<string, string> = {
   zec: zecIcon,
 };
 
+import { BrandIcon } from './BrandIcon';
+
 function iconFor(symbol: string): string | null {
   return ICONS[symbol.toLowerCase().replace(/usdt$/i, '').replace(/usd$/i, '')] ?? null;
 }
@@ -118,7 +120,11 @@ export function InstrumentInfoBar(p: InstrumentInfoBarProps): JSX.Element {
         >
           {p.watched ? '★' : '☆'}
         </span>
-        {icon && <img src={icon} alt="" className="switcher-icon" width={22} height={22} />}
+        {icon ? (
+          <img src={icon} alt="" className="switcher-icon" width={22} height={22} />
+        ) : (
+          <BrandIcon symbol={i.symbol} />
+        )}
         <strong className="switcher-symbol">{i.symbol}</strong>
         <span className="switcher-arrow" aria-hidden>⌄</span>
       </button>

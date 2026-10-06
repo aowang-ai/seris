@@ -2101,3 +2101,21 @@ button:disabled {
 .dropdown-row .col-oi { justify-content: flex-end; font-size: 11px; color: var(--muted-foreground); text-align: right; }
 .dropdown-row .col-change.up { color: #38a88c; }
 .dropdown-row .col-change.down { color: #dc777b; }
+
+/* BrandIcon — styled letter badge for instruments without a coin icon */
+.brand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+  user-select: none;
+  letter-spacing: 0;
+  font-family: inherit;
+}
+.brand-icon-default {
+  background: var(--muted, rgba(128,128,128,.18));
+  color: var(--muted-foreground);
+}

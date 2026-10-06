@@ -57,6 +57,8 @@ const ICON_MAP: Record<string, string> = {
   zec: zecIcon,
 };
 
+import { BrandIcon } from './BrandIcon';
+
 function instrumentIcon(symbol: string): string | null {
   const s = symbol.toLowerCase().replace(/usdt$/, '').replace(/usd$/, '');
   return ICON_MAP[s] ?? null;
@@ -135,8 +137,10 @@ export function MarketWatchlist({
               onClick={() => onSelect(i)}
             >
               <span className="watchlist-cell watchlist-icon">
-                {instrumentIcon(i.symbol) && (
+                {instrumentIcon(i.symbol) ? (
                   <img src={instrumentIcon(i.symbol)!} alt="" width={22} height={22} />
+                ) : (
+                  <BrandIcon symbol={i.symbol} />
                 )}
               </span>
               <span className="watchlist-cell watchlist-symbol">

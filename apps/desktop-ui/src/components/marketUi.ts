@@ -17,9 +17,11 @@ export const venue = (i: Instrument, language: Language) =>
     ? `Hyperliquid · ${translate(language, 'Perpetual')}`
     : i.venue === 'binance'
       ? `Binance · ${translate(language, 'USDT spot')}`
-      : i.kind === 'etf'
-        ? `${translate(language, 'US stocks')} · ETF`
-        : translate(language, 'US stocks');
+      : i.venue === 'binance-tradifi'
+        ? `Binance · ${translate(language, 'USDT TradFi perpetual')}`
+        : i.kind === 'etf'
+          ? `${translate(language, 'US stocks')} · ETF`
+          : translate(language, 'US stocks');
 export const instrumentName = (i: Instrument, language: Language) =>
   i.name === `${i.symbol} Perpetual`
     ? `${i.symbol} ${translate(language, 'Perpetual')}`

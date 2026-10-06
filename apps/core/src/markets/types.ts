@@ -6,7 +6,7 @@ export interface Instrument {
   symbol: string;
   name: string;
   kind: 'crypto' | 'stock' | 'etf';
-  venue: 'hyperliquid' | 'binance' | 'us';
+  venue: 'hyperliquid' | 'binance' | 'binance-tradifi' | 'us';
   providerSymbol: string;
   /** Max leverage for perpetuals (e.g., 40 for BTC on Hyperliquid). */
   maxLeverage?: number;
@@ -121,7 +121,7 @@ export function isInstrument(v: unknown): v is Instrument {
   if (
     !object(v) ||
     !['crypto', 'stock', 'etf'].includes(v.kind) ||
-    !['hyperliquid', 'binance', 'us'].includes(v.venue)
+    !['hyperliquid', 'binance', 'binance-tradifi', 'us'].includes(v.venue)
   )
     return false;
   if (
@@ -135,6 +135,12 @@ export function isInstrument(v: unknown): v is Instrument {
       v.kind !== 'crypto' &&
       /^[A-Z0-9.-]{1,24}\.US$/.test(v.providerSymbol) &&
       v.id === `us:${v.providerSymbol}`
+    );
+  if (v.venue === 'binance-tradifi')
+    return (
+      v.kind !== 'crypto' &&
+      /^[A-Z][A-Z0-9]{1,15}USDT$/.test(v.providerSymbol) &&
+      v.id === `binance-tradifi:${v.providerSymbol}`
     );
   return (
     v.kind === 'crypto' &&

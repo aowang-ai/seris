@@ -65,6 +65,8 @@ const ICONS: Record<string, string> = {
   zec: zecIcon,
 };
 
+import { BrandIcon } from './BrandIcon';
+
 function iconFor(symbol: string): string | null {
   return ICONS[symbol.toLowerCase().replace(/usdt$/i, '').replace(/usd$/i, '')] ?? null;
 }
@@ -246,8 +248,10 @@ export function MarketDropdown(p: MarketDropdownProps): JSX.Element | null {
                 >
                   {watched ? '★' : '☆'}
                 </span>
-                {iconFor(i.symbol) && (
+                {iconFor(i.symbol) ? (
                   <img src={iconFor(i.symbol)!} alt="" width={18} height={18} />
+                ) : (
+                  <BrandIcon symbol={i.symbol} />
                 )}
                 <strong>{i.symbol}</strong>
                 {i.maxLeverage && <em className="row-leverage">{i.maxLeverage}X</em>}

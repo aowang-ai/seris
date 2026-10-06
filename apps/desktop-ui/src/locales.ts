@@ -372,5 +372,6 @@ export const zh = {
   'Unwatch {symbol}': '取消自选 {symbol}',
   'Instrument summary': '标的摘要',
   'Select instrument': '选择标的',
+  'USDT TradFi perpetual': 'USDT 传统金融永续',
 } as const;
 export type MessageKey = keyof typeof zh;

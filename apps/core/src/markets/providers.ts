@@ -278,6 +278,7 @@ const intervalMs: Record<MarketInterval, number> = {
 export class PublicMarketProvider implements MarketProvider {
   readonly longbridge = new LongbridgeData();
   private universe?: { at: number; coins: Array<{ name: string; maxLeverage?: number }> };
+  private tradifi?: { at: number; symbols: Array<{ symbol: string; baseAsset: string }> };
   async search(query: string): Promise<Instrument[]> {
     const q = query.trim().toUpperCase();
     if (!q) return [];
@@ -369,6 +370,54 @@ export class PublicMarketProvider implements MarketProvider {
               }),
             );
       })(),
+      (async () => {
+        // Binance USDT-M traditional-finance perpetuals. Symbols end in "USDT"
+        // with base tickers like TSLA / NVDA / AAPL.
+        if (!/^[A-Z0-9]{1,20}$/.test(q)) return;
+        try {
+          if (!this.tradifi || Date.now() - this.tradifi.at > 300000) {
+            const info = await json(
+              'https://fapi.binance.com/fapi/v1/exchangeInfo',
+            );
+            const rows = (info.symbols ?? []).filter(
+              (s: any) =>
+                s.status === 'TRADING' && s.contractType === 'TRADIFI_PERPETUAL',
+            );
+            this.tradifi = {
+              at: Date.now(),
+              symbols: rows.map((s: any) => ({
+                symbol: s.symbol,
+                baseAsset: s.baseAsset,
+              })),
+            };
+          }
+          for (const s of this.tradifi.symbols
+            .filter(
+              (x) =>
+                x.baseAsset === q ||
+                x.symbol === spotSymbol ||
+                x.baseAsset.startsWith(q),
+            )
+            .slice(0, 8)) {
+            const kind = ['SPY', 'QQQ', 'TQQQ', 'SQQQ', 'ESP'].includes(s.baseAsset)
+              ? ('etf' as const)
+              : ('stock' as const);
+            try {
+              results.push(
+                parseInstrument({
+                  id: `binance-tradifi:${s.symbol}`,
+                  symbol: s.baseAsset,
+                  name: `${s.baseAsset} / USDT perpetual`,
+                  kind,
+                  venue: 'binance-tradifi',
+                  providerSymbol: s.symbol,
+                  maxLeverage: undefined,
+                }),
+              );
+            } catch {}
+          }
+        } catch { /* tradifi enrichment is optional */ }
+      })(),
     ]);
     if (
       /^[A-Z][A-Z0-9.-]{0,15}$/.test(q) &&
@@ -425,6 +474,33 @@ export class PublicMarketProvider implements MarketProvider {
         time: Number(q.closeTime),
         fetchedAt: Date.now(),
         changePeriod: '24h',
+      };
+    }
+    if (instrument.venue === 'binance-tradifi') {
+      const [ticker, premium] = await Promise.allSettled([
+        json(
+          `https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${encodeURIComponent(instrument.providerSymbol)}`,
+        ),
+        json(
+          `https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${encodeURIComponent(instrument.providerSymbol)}`,
+        ),
+      ]);
+      const t = ticker.status === 'fulfilled' ? ticker.value : null;
+      const p = premium.status === 'fulfilled' ? premium.value : null;
+      if (!t) throw new Error('Binance tradifi quote unavailable');
+      return {
+        instrument,
+        price: Number(t.lastPrice),
+        currency: 'USDT',
+        changePct: finite(t.priceChangePercent),
+        volume: finite(t.quoteVolume),
+        source: 'Binance USDT perpetual',
+        priceType: 'last',
+        time: Number(t.closeTime),
+        fetchedAt: Date.now(),
+        changePeriod: '24h',
+        fundingHourlyPct: p?.lastFundingRate ? Number(p.lastFundingRate) * 100 : undefined,
+        openInterestUsd: undefined,
       };
     }
     const { quotes } = await this.longbridge.context();
@@ -488,6 +564,25 @@ export class PublicMarketProvider implements MarketProvider {
         adjustment: 'none',
         candles: cleanCandles(
           data.candles.map((r: any) => ({ ...r, time: r.openTime / 1000 })),
+        ),
+      };
+    }
+    if (instrument.venue === 'binance-tradifi') {
+      const rows = await json(
+        `https://fapi.binance.com/fapi/v1/klines?symbol=${encodeURIComponent(instrument.providerSymbol)}&interval=${interval}&limit=500`,
+      );
+      return {
+        source: 'Binance USDT perpetual',
+        adjustment: 'none',
+        candles: cleanCandles(
+          rows.map((k: any[]) => ({
+            time: Number(k[0]) / 1000,
+            open: Number(k[1]),
+            high: Number(k[2]),
+            low: Number(k[3]),
+            close: Number(k[4]),
+            volume: Number(k[5]),
+          })),
         ),
       };
     }
