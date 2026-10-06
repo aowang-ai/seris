@@ -1,12 +1,19 @@
 /** Shared Markets contracts. This module has no server or chart-library imports. */
 export const MARKET_INTERVALS = ['15m', '1h', '4h', '1d', '1w'] as const;
 export type MarketInterval = (typeof MARKET_INTERVALS)[number];
+export type InstrumentKind =
+  | 'crypto'
+  | 'stock'
+  | 'etf'
+  | 'commodity'
+  | 'forex'
+  | 'index';
 export interface Instrument {
   id: string;
   symbol: string;
   name: string;
-  kind: 'crypto' | 'stock' | 'etf';
-  venue: 'hyperliquid' | 'binance' | 'binance-tradifi' | 'us';
+  kind: InstrumentKind;
+  venue: 'hyperliquid' | 'hyperliquid-xyz' | 'binance' | 'binance-tradifi' | 'us';
   providerSymbol: string;
   /** Max leverage for perpetuals (e.g., 40 for BTC on Hyperliquid). */
   maxLeverage?: number;
@@ -120,8 +127,10 @@ const finite = (v: unknown): v is number =>
 export function isInstrument(v: unknown): v is Instrument {
   if (
     !object(v) ||
-    !['crypto', 'stock', 'etf'].includes(v.kind) ||
-    !['hyperliquid', 'binance', 'binance-tradifi', 'us'].includes(v.venue)
+    !['crypto', 'stock', 'etf', 'commodity', 'forex', 'index'].includes(v.kind as string) ||
+    !['hyperliquid', 'hyperliquid-xyz', 'binance', 'binance-tradifi', 'us'].includes(
+      v.venue as string,
+    )
   )
     return false;
   if (
@@ -141,6 +150,12 @@ export function isInstrument(v: unknown): v is Instrument {
       v.kind !== 'crypto' &&
       /^[A-Z][A-Z0-9]{1,15}USDT$/.test(v.providerSymbol) &&
       v.id === `binance-tradifi:${v.providerSymbol}`
+    );
+  if (v.venue === 'hyperliquid-xyz')
+    return (
+      v.kind !== 'crypto' &&
+      /^xyz:[A-Z0-9.-]{1,24}$/.test(v.providerSymbol) &&
+      v.id === `hyperliquid-xyz:${v.providerSymbol}`
     );
   return (
     v.kind === 'crypto' &&

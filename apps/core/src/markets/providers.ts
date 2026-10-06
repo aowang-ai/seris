@@ -275,10 +275,32 @@ const intervalMs: Record<MarketInterval, number> = {
   '1d': 86400000,
   '1w': 604800000,
 };
+
+/** Map an xyz dex short name to a Seris kind. Used by the search provider. */
+function classifyXyzKind(name: string): 'stock' | 'etf' | 'commodity' | 'forex' | 'index' {
+  const COMMODITIES = new Set(['GOLD','SILVER','CL','BRENTOIL','NATGAS','COPPER','PLATINUM','PALLADIUM','URANIUM','WHEAT','CORN','HO','ALUMINIUM']);
+  const FX = new Set(['EUR','JPY','GBP','KRW']);
+  const INDICES = new Set([
+    'SP500','XYZ100','DXY','VIX','NIFTY','IBOV','JP225','KR200',
+    'MAGS','TOTAL2','MAG7','US500','USA500','SMALL2000','BTCD','AVGO','H100',
+    'SEMIS','ES','ESP','TQQQ','SQQQ','SOXL',
+  ]);
+  const ETFS = new Set(['TLT','XBI','XLE','URNM','EWJ','EWT','EWY','EWZ','SMH','XLU','IWM','SPY','QQQ']);
+  if (COMMODITIES.has(name)) return 'commodity';
+  if (FX.has(name)) return 'forex';
+  if (INDICES.has(name)) return 'index';
+  if (ETFS.has(name)) return 'etf';
+  // Default: individual equities (NVDA, TSLA, AAPL, SMSN, SKHY, TSM, etc.)
+  return 'stock';
+}
 export class PublicMarketProvider implements MarketProvider {
   readonly longbridge = new LongbridgeData();
   private universe?: { at: number; coins: Array<{ name: string; maxLeverage?: number }> };
   private tradifi?: { at: number; symbols: Array<{ symbol: string; baseAsset: string }> };
+  private xyzUniverse?: {
+    at: number;
+    entries: Array<{ name: string; maxLeverage?: number }>;
+  };
   async search(query: string): Promise<Instrument[]> {
     const q = query.trim().toUpperCase();
     if (!q) return [];
@@ -411,12 +433,52 @@ export class PublicMarketProvider implements MarketProvider {
                   kind,
                   venue: 'binance-tradifi',
                   providerSymbol: s.symbol,
-                  maxLeverage: undefined,
                 }),
               );
             } catch {}
           }
         } catch { /* tradifi enrichment is optional */ }
+      })(),
+      (async () => {
+        // Hyperliquid xyz builder DEX — non-crypto perp markets (stocks, commodities,
+        // FX, indices, ETFs). Universe is fetched once per 5 minutes.
+        if (!/^[A-Z0-9.-]{1,24}$/i.test(q)) return;
+        try {
+          if (!this.xyzUniverse || Date.now() - this.xyzUniverse.at > 300000) {
+            const meta = await json('https://api.hyperliquid.xyz/info', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ type: 'meta', dex: 'xyz' }),
+            });
+            this.xyzUniverse = {
+              at: Date.now(),
+              entries: (meta.universe ?? []).map((u: any) => ({
+                name: u.name as string,
+                maxLeverage: u.maxLeverage as number | undefined,
+              })),
+            };
+          }
+          const query = q.toUpperCase();
+          for (const entry of this.xyzUniverse.entries
+            .filter((e) => e.name.toUpperCase().includes(query))
+            .slice(0, 12)) {
+            const shortName = entry.name.replace(/^xyz:/, '');
+            const kind = classifyXyzKind(shortName);
+            try {
+              results.push(
+                parseInstrument({
+                  id: `hyperliquid-xyz:${entry.name}`,
+                  symbol: shortName,
+                  name: `${shortName} (xyz perp)`,
+                  kind,
+                  venue: 'hyperliquid-xyz',
+                  providerSymbol: entry.name,
+                  maxLeverage: entry.maxLeverage,
+                }),
+              );
+            } catch {}
+          }
+        } catch { /* xyz enrichment is optional */ }
       })(),
     ]);
     if (
@@ -503,6 +565,48 @@ export class PublicMarketProvider implements MarketProvider {
         openInterestUsd: undefined,
       };
     }
+    if (instrument.venue === 'hyperliquid-xyz') {
+      const [mids, funding] = await Promise.allSettled([
+        json('https://api.hyperliquid.xyz/info', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ type: 'allMids', dex: 'xyz' }),
+        }),
+        json('https://api.hyperliquid.xyz/info', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            type: 'fundingHistory',
+            coin: instrument.providerSymbol,
+            startTime: Date.now() - 86400000,
+          }),
+        }),
+      ]);
+      if (mids.status !== 'fulfilled') throw new Error('xyz mids unavailable');
+      const markStr = mids.value?.[instrument.providerSymbol];
+      if (!markStr) throw new Error(`xyz has no quote for ${instrument.providerSymbol}`);
+      const price = parseFloat(markStr);
+      let fundingHourlyPct: number | undefined;
+      if (funding.status === 'fulfilled' && Array.isArray(funding.value) && funding.value.length > 0) {
+        const latest = funding.value[funding.value.length - 1];
+        const rate = parseFloat(latest?.fundingRate ?? '0');
+        if (Number.isFinite(rate)) fundingHourlyPct = rate * 100;
+      }
+      return {
+        instrument,
+        price,
+        currency: 'USD',
+        changePct: null,
+        volume: null,
+        source: 'Hyperliquid xyz',
+        priceType: 'mark',
+        time: Date.now(),
+        fetchedAt: Date.now(),
+        changePeriod: '24h',
+        fundingHourlyPct,
+        openInterestUsd: undefined,
+      };
+    }
     const { quotes } = await this.longbridge.context();
     const [q] = await sdkRead(quotes.quote([instrument.providerSymbol]));
     if (!q) throw new Error('Stock quote unavailable');
@@ -582,6 +686,36 @@ export class PublicMarketProvider implements MarketProvider {
             low: Number(k[3]),
             close: Number(k[4]),
             volume: Number(k[5]),
+          })),
+        ),
+      };
+    }
+    if (instrument.venue === 'hyperliquid-xyz') {
+      const end = Date.now();
+      const rows = await json('https://api.hyperliquid.xyz/info', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type: 'candleSnapshot',
+          req: {
+            coin: instrument.providerSymbol,
+            interval,
+            startTime: end - intervalMs[interval] * 500,
+            endTime: end,
+          },
+        }),
+      });
+      return {
+        source: 'Hyperliquid xyz',
+        adjustment: 'none',
+        candles: cleanCandles(
+          rows.map((r: any) => ({
+            time: Number(r.t) / 1000,
+            open: Number(r.o),
+            high: Number(r.h),
+            low: Number(r.l),
+            close: Number(r.c),
+            volume: Number(r.v),
           })),
         ),
       };

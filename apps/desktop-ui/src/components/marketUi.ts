@@ -12,16 +12,25 @@ export const price = (v: number, locale?: string) =>
   v.toLocaleString(locale, { maximumFractionDigits: pricePrecision(v) });
 export const time = (v: number, locale?: string) =>
   new Date(v).toLocaleString(locale);
-export const venue = (i: Instrument, language: Language) =>
-  i.venue === 'hyperliquid'
-    ? `Hyperliquid · ${translate(language, 'Perpetual')}`
-    : i.venue === 'binance'
-      ? `Binance · ${translate(language, 'USDT spot')}`
-      : i.venue === 'binance-tradifi'
-        ? `Binance · ${translate(language, 'USDT TradFi perpetual')}`
-        : i.kind === 'etf'
-          ? `${translate(language, 'US stocks')} · ETF`
-          : translate(language, 'US stocks');
+export const venue = (i: Instrument, language: Language) => {
+  if (i.venue === 'hyperliquid') return `Hyperliquid · ${translate(language, 'Perpetual')}`;
+  if (i.venue === 'hyperliquid-xyz') {
+    const kindLabel =
+      i.kind === 'commodity'
+        ? 'Commodity'
+        : i.kind === 'forex'
+          ? 'FX'
+          : i.kind === 'index'
+            ? 'Index'
+            : i.kind === 'etf'
+              ? 'ETF'
+              : 'Stock';
+    return `Hyperliquid · xyz ${translate(language, kindLabel)}`;
+  }
+  if (i.venue === 'binance') return `Binance · ${translate(language, 'USDT spot')}`;
+  if (i.venue === 'binance-tradifi') return `Binance · ${translate(language, 'USDT TradFi perpetual')}`;
+  return i.kind === 'etf' ? `${translate(language, 'US stocks')} · ETF` : translate(language, 'US stocks');
+};
 export const instrumentName = (i: Instrument, language: Language) =>
   i.name === `${i.symbol} Perpetual`
     ? `${i.symbol} ${translate(language, 'Perpetual')}`

@@ -373,5 +373,10 @@ export const zh = {
   'Instrument summary': '标的摘要',
   'Select instrument': '选择标的',
   'USDT TradFi perpetual': 'USDT 传统金融永续',
+  Commodity: '大宗商品',
+  FX: '外汇',
+  Index: '指数',
+  Stock: '股票',
+  ETF: 'ETF',
 } as const;
 export type MessageKey = keyof typeof zh;
