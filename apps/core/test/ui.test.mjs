@@ -11,6 +11,22 @@ import { ModelSettings } from '../dist/runtime/modelSettings.js';
 import { MemorySecrets } from '../dist/runtime/credentials.js';
 import { startGateway } from '../dist/gateway/server.js';
 
+/** Poll `fn` until truthy or timeout. */
+async function until(fn, { timeoutMs = 5000, intervalMs = 50 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      const v = await fn();
+      if (v) return v;
+    } catch (e) {
+      lastError = e;
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw lastError ?? new Error('until() timed out');
+}
+
 test('built UI discovers models, saves multiple choices, scopes blank keys, and searches/pins/switches in Chat', async (t) => {
   const dir = await mkdtemp(join(tmpdir(), 'seris-ui-'));
   process.env.SERIS_DATA_DIR = dir;
@@ -135,6 +151,8 @@ test('built UI discovers models, saves multiple choices, scopes blank keys, and 
     assert.equal(runtime.modelConfig().connections[0].models.length, 2);
     assert.equal(runtime.modelConfig().connections[0].contextWindow, 65536);
     assert.equal(runtime.modelConfig().connections[0].maxTokens, 4096);
+    // Discovery may be racing the click; wait for it to land before asserting.
+    await until(() => requests.length > 0, { timeoutMs: 5000 });
     assert.equal(requests[0].auth, 'Bearer fixture-not-real-key');
     const stored = await readFile(join(dir, '.data/models.json'), 'utf8');
     assert.equal(stored.includes('fixture-not-real-key'), false);

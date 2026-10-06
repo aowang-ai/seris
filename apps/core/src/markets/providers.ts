@@ -277,7 +277,7 @@ const intervalMs: Record<MarketInterval, number> = {
 };
 export class PublicMarketProvider implements MarketProvider {
   readonly longbridge = new LongbridgeData();
-  private universe?: { at: number; coins: string[] };
+  private universe?: { at: number; coins: Array<{ name: string; maxLeverage?: number }> };
   async search(query: string): Promise<Instrument[]> {
     const q = query.trim().toUpperCase();
     if (!q) return [];
@@ -296,21 +296,22 @@ export class PublicMarketProvider implements MarketProvider {
               at: Date.now(),
               coins: meta.universe
                 .filter((v: any) => !v.isDelisted)
-                .map((v: any) => v.name),
+                .map((v: any) => ({ name: v.name, maxLeverage: v.maxLeverage })),
             };
           }
-          for (const symbol of this.universe.coins
-            .filter((s) => s.includes(q))
+          for (const coin of this.universe.coins
+            .filter((c) => c.name.includes(q))
             .slice(0, 8)) {
             try {
               results.push(
                 parseInstrument({
-                  id: `hyperliquid:${symbol}`,
-                  symbol,
-                  name: `${symbol} Perpetual`,
+                  id: `hyperliquid:${coin.name}`,
+                  symbol: coin.name,
+                  name: `${coin.name} Perpetual`,
                   kind: 'crypto',
                   venue: 'hyperliquid',
-                  providerSymbol: symbol,
+                  providerSymbol: coin.name,
+                  maxLeverage: coin.maxLeverage,
                 }),
               );
             } catch {}

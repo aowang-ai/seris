@@ -33,13 +33,13 @@ import {
   instrumentName,
   openMarketLink,
 } from './marketUi';
-import { MarketWatchlist } from './MarketWatchlist';
+import { InstrumentInfoBar } from './InstrumentInfoBar';
+import { MarketDropdown } from './MarketDropdown';
 import {
   MarketNewsPanel,
   MarketAlertsPanel,
   AlertEditor,
 } from './MarketActivity';
-import { MarketSearch } from './MarketSearch';
 
 const DETAIL_TABS = [
   ['chart', 'Chart'],
@@ -81,11 +81,6 @@ export function MarketsPanel(p: Props) {
   const [newsLoading, setNewsLoading] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const chatToggle = useRef<HTMLButtonElement>(null);
-  const watchToggle = useRef<HTMLButtonElement>(null);
-  const closeWatchlist = () => {
-    setWatchlistPreference(false);
-    watchToggle.current?.focus();
-  };
   const closeChat = () => {
     setChatOpen(false);
     chatToggle.current?.focus();
@@ -98,13 +93,11 @@ export function MarketsPanel(p: Props) {
     }
   }, [p.chatRequest]);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [watchlistPreference, setWatchlistPreference] = useState<boolean>();
   const [narrow, setNarrow] = useState(
     () => window.matchMedia('(max-width: 1200px)').matches,
   );
   const [watchPending, setWatchPending] = useState(false);
   const watchUpdating = useRef(false);
-  const watchlistVisible = watchlistPreference ?? !(chatOpen && narrow);
   const watched =
     state?.watchlist.some((i) => i.id === instrument?.id) ?? false;
   useEffect(() => {
@@ -439,7 +432,6 @@ export function MarketsPanel(p: Props) {
   };
   const q =
     chart?.quote ?? (instrument ? quotes[instrument.id]?.quote : undefined);
-  const dataAge = q ? Date.now() - q.time : 0;
   const resize = (e: React.PointerEvent<HTMLDivElement>) => {
     setResizing(true);
     const start = e.clientX,
@@ -461,36 +453,32 @@ export function MarketsPanel(p: Props) {
       style={{ display: p.active ? undefined : 'none' }}
     >
       <div className="markets-topbar">
-        <button
-          className="market-watchlist-toggle"
-          ref={watchToggle}
-          aria-label={
-            watchlistVisible ? t('Collapse watchlist') : t('Expand watchlist')
-          }
-          aria-expanded={watchlistVisible}
-          onClick={() => setWatchlistPreference(!watchlistVisible)}
-        >
-          ☰ <span>{t('Watchlist')}</span>
-        </button>
-        <button
-          className="market-search-trigger"
-          onClick={() => setSearchOpen(true)}
-          aria-label={t('Search markets')}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            aria-hidden="true"
-          >
-            <circle cx="10.5" cy="10.5" r="6.5" />
-            <path d="m16 16 5 5" />
-          </svg>
-          <span>{t('Search symbol or name…')}</span>
-        </button>
+        {instrument && (
+          <div className="instrument-info-bar-anchor">
+            <InstrumentInfoBar
+              instrument={instrument}
+              quote={q}
+              watched={watched}
+              watchPending={watchPending}
+              dropdownOpen={searchOpen}
+              onToggleWatch={() =>
+                void toggleWatch(instrument).catch((e) => setError(String(e)))
+              }
+              onOpenDropdown={() => setSearchOpen(!searchOpen)}
+            />
+            <MarketDropdown
+              open={searchOpen}
+              onClose={(next) => {
+                setSearchOpen(false);
+                if (next) change(next);
+              }}
+              watchlist={state?.watchlist ?? []}
+              quotes={quotes}
+              onToggleWatch={toggleWatch}
+              selectedId={instrument.id}
+            />
+          </div>
+        )}
         <button
           className="market-top-chat"
           ref={chatToggle}
@@ -521,37 +509,6 @@ export function MarketsPanel(p: Props) {
         </button>
       </div>
       <div className="markets-body">
-        {watchlistVisible && chatOpen && narrow && (
-          <button
-            className="watchlist-backdrop"
-            aria-label={t('Close watchlist')}
-            onClick={closeWatchlist}
-          />
-        )}
-        <div
-          className={`market-watchlist-shell ${watchlistVisible ? '' : 'is-closed'} ${chatOpen && narrow ? 'is-overlay' : ''}`}
-          aria-hidden={!watchlistVisible}
-          {...(!watchlistVisible ? { inert: '' } : {})}
-        >
-          <MarketWatchlist
-            state={state}
-            quotes={quotes}
-            selected={instrument?.id}
-            onSelect={(i) => {
-              change(i);
-              if (chatOpen && narrow) closeWatchlist();
-            }}
-            onRemove={async (i) => {
-              try {
-                await remove(i);
-              } catch (e) {
-                setError(String(e));
-              }
-            }}
-            onConnect={connect}
-            onError={setError}
-          />
-        </div>
         <section className="market-detail">
           {error && (
             <div role="alert" className="market-error">
@@ -561,72 +518,6 @@ export function MarketsPanel(p: Props) {
           )}
           {instrument ? (
             <>
-              <header className="market-heading">
-                <div>
-                  <h1>
-                    {instrument.symbol}
-                    <button
-                      className="market-star"
-                      disabled={watchPending}
-                      aria-label={
-                        watched
-                          ? t('Unwatch current instrument')
-                          : t('Watch current instrument')
-                      }
-                      aria-pressed={watched}
-                      onClick={() =>
-                        void toggleWatch(instrument).catch((e) =>
-                          setError(String(e)),
-                        )
-                      }
-                    >
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill={watched ? 'currentColor' : 'none'}
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="m12 3 2.8 5.7 6.3.9-4.6 4.4 1.1 6.3-5.6-3-5.6 3 1.1-6.3L3 9.6l6.2-.9Z" />
-                      </svg>
-                    </button>
-                    <span>{instrumentName(instrument, language)}</span>
-                  </h1>
-                  <small>{venue(instrument, language)}</small>
-                </div>
-              </header>
-              <div className="market-quote">
-                <strong>
-                  {q
-                    ? q.currency === 'USDT'
-                      ? `${price(q.price, locale)} USDT`
-                      : `$${price(q.price, locale)}`
-                    : '—'}
-                </strong>
-                {q?.changePct != null && (
-                  <span className={q.changePct < 0 ? 'down' : 'up'}>
-                    {q.changePct > 0 ? '+' : ''}
-                    {q.changePct.toFixed(2)}%{' '}
-                    <small>
-                      {q.changePeriod === '24h'
-                        ? t('24h')
-                        : t('Previous close')}
-                    </small>
-                  </span>
-                )}
-                {q && (
-                  <small className="market-update">
-                    {dataAge > 300000 ? t('Historical quote') : t('Updated')}{' '}
-                    {new Date(q.time).toLocaleTimeString(locale, {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </small>
-                )}
-              </div>
               <Tabs.Root
                 value={tab}
                 onValueChange={(value) => changeTab(value as DetailTab)}
@@ -849,13 +740,6 @@ export function MarketsPanel(p: Props) {
           </aside>
         </div>
       </div>
-      <MarketSearch
-        open={searchOpen}
-        watchlist={state?.watchlist ?? []}
-        onSelect={change}
-        onToggle={toggleWatch}
-        onClose={() => setSearchOpen(false)}
-      />
     </div>
   );
 }

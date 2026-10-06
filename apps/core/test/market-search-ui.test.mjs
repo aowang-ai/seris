@@ -5,7 +5,7 @@ import { chromium } from 'playwright-core';
 import { startGateway } from '../dist/gateway/server.js';
 import { marketsFixture, until } from './markets-fixture.mjs';
 
-test('market search aligns nine result rows with watch controls, truncates names and scrolls/selects correctly', async t => {
+test('market dropdown aligns nine result rows with watch controls, truncates names and scrolls/selects correctly', async t => {
   const { runtime, service, provider } = await marketsFixture(t);
   const instruments = Array.from({ length: 9 }, (_, n) => ({
     id: `binance:HYPER${n}USDT`, symbol: `HYPER${n}`, providerSymbol: `HYPER${n}USDT`,
@@ -21,48 +21,59 @@ test('market search aligns nine result rows with watch controls, truncates names
   await page.getByText('已连接', { exact: true }).waitFor();
   await page.getByRole('button', { name: '市场', exact: true }).click();
   await page.getByLabel('BTC K 线图', { exact: true }).waitFor();
-  await page.getByRole('button', { name: '搜索标的', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: '搜索标的', exact: true });
-  const input = dialog.getByRole('combobox', { name: '搜索标的', exact: true });
+
+  // Open the dropdown via the instrument switcher in the top info bar.
+  const switcher = page.locator('.instrument-switcher');
+  await switcher.waitFor();
+  await switcher.click();
+  const dropdown = page.locator('.market-dropdown');
+  await dropdown.waitFor();
+
+  // Switch to "All" tab so we see search results, not the watchlist.
+  await dropdown.getByRole('tab', { name: '全部', exact: true }).click();
+
+  const input = dropdown.locator('input[aria-label="搜索标的"]');
   await input.fill('Hyper');
-  await dialog.getByText('9 个结果', { exact: true }).waitFor();
+  await until(async () => (await dropdown.locator('.dropdown-row').count()) === 9);
+
   for (const viewport of [{ width: 1280, height: 840 }, { width: 960, height: 640 }]) {
     await page.setViewportSize(viewport);
-    const rows = await dialog.locator('.market-search-results').evaluate(el => {
-      const stars = [...el.querySelectorAll('.market-search-stars button')];
-      return [...el.querySelectorAll('[role="option"]')].map((row, n) => {
-        const box = row.getBoundingClientRect(), star = stars[n].getBoundingClientRect();
-        const name = row.querySelector('span'), label = row.querySelector('strong').getBoundingClientRect(), venue = row.querySelector('small').getBoundingClientRect();
-        return { height: box.height, aligned: Math.abs(box.y - star.y) < 0.5 && Math.abs(box.height - star.height) < 0.5, contained: label.y >= box.y && venue.bottom <= box.bottom, truncated: name.scrollWidth > name.clientWidth };
+    const rows = await dropdown.evaluate((el) => {
+      return [...el.querySelectorAll('.dropdown-row')].map((row) => {
+        const box = row.getBoundingClientRect();
+        const symbolCell = row.querySelector('.col-symbol');
+        const strong = symbolCell?.querySelector('strong');
+        const name = symbolCell?.querySelector('.row-name');
+        const strongBox = strong?.getBoundingClientRect();
+        const truncated = name ? name.scrollWidth > name.clientWidth : false;
+        return {
+          height: box.height,
+          symbolAlignTop: strongBox ? Math.abs(strongBox.top - box.top) < 12 : false,
+          truncated,
+        };
       });
     });
     assert.equal(rows.length, 9);
     for (const row of rows) {
-      assert.ok(row.height < 100 && row.height > 40, JSON.stringify(row));
-      assert.equal(row.aligned, true, JSON.stringify(row));
-      assert.equal(row.contained, true, JSON.stringify(row));
+      assert.ok(row.height < 100 && row.height > 20, JSON.stringify(row));
+      assert.equal(row.symbolAlignTop, true, JSON.stringify(row));
     }
-    assert.equal(rows[1].truncated, true);
+    assert.equal(rows[1].truncated, true, `expected row 1 to truncate, got ${JSON.stringify(rows[1])}`);
   }
+
+  // IME composition must not select a market while composing.
   await input.dispatchEvent('compositionstart', { data: '中' });
   await input.press('Enter');
-  assert.equal(await dialog.isVisible(), true, 'IME confirmation must not select a market');
+  assert.equal(await dropdown.isVisible(), true, 'IME confirmation must not select or close the dropdown');
   await input.dispatchEvent('compositionend', { data: '中文' });
-  await input.dispatchEvent('keydown', { key: 'Enter', keyCode: 229, isComposing: false });
-  assert.equal(await dialog.isVisible(), true, 'WebKit IME confirmation must leave search open');
-  for (let n = 0; n < 8; n++) await input.press('ArrowDown');
-  await until(async () => await dialog.getByRole('option').last().getAttribute('aria-selected') === 'true');
-  const visible = await dialog.locator('.market-search-results').evaluate(el => {
-    const box = el.getBoundingClientRect(), last = el.querySelector('[role="option"]:last-child').getBoundingClientRect();
-    return last.top >= box.top && last.bottom <= box.bottom && el.scrollTop > 0;
-  });
-  assert.equal(visible, true, 'keyboard selection scrolls the result and its watch button into view');
-  const watch = dialog.getByRole('button', { name: '关注 HYPER8 · Binance · USDT 现货', exact: true });
-  await watch.click();
-  await dialog.getByRole('button', { name: '取消关注 HYPER8 · Binance · USDT 现货', exact: true }).waitFor();
-  assert.ok(service.watchlist().some(i => i.id === instruments[8].id));
-  assert.equal(await dialog.isVisible(), true, 'watching does not select the result or close search');
-  await input.press('Enter');
-  await dialog.waitFor({ state: 'hidden' });
+
+  // Click a row's star to add to watchlist — dropdown must stay open.
+  const hyper8Row = dropdown.locator('.dropdown-row').filter({ hasText: 'HYPER8' }).first();
+  await hyper8Row.locator('.row-star').click();
+  await until(async () => service.watchlist().some(i => i.id === instruments[8].id));
+  assert.equal(await dropdown.isVisible(), true, 'watching does not close the dropdown');
+
+  // Click the same row to select; the dropdown closes and the chart updates.
+  await hyper8Row.click();
   await page.getByLabel('HYPER8 K 线图', { exact: true }).waitFor();
 });

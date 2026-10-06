@@ -8,6 +8,8 @@ export interface Instrument {
   kind: 'crypto' | 'stock' | 'etf';
   venue: 'hyperliquid' | 'binance' | 'us';
   providerSymbol: string;
+  /** Max leverage for perpetuals (e.g., 40 for BTC on Hyperliquid). */
+  maxLeverage?: number;
 }
 export interface MarketQuote {
   instrument: Instrument;
@@ -142,7 +144,7 @@ export function isInstrument(v: unknown): v is Instrument {
 }
 export function parseInstrument(v: unknown): Instrument {
   if (!isInstrument(v)) throw new Error('Invalid market instrument');
-  return {
+  const out: Instrument = {
     id: v.id,
     symbol: v.symbol,
     name: v.name,
@@ -150,6 +152,8 @@ export function parseInstrument(v: unknown): Instrument {
     venue: v.venue,
     providerSymbol: v.providerSymbol,
   };
+  if (typeof v.maxLeverage === 'number') out.maxLeverage = v.maxLeverage;
+  return out;
 }
 export function parseInterval(v: unknown): MarketInterval {
   if (!MARKET_INTERVALS.includes(v as MarketInterval))

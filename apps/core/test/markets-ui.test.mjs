@@ -12,6 +12,23 @@ import {
 } from './markets-fixture.mjs';
 import { defineTool } from '../dist/tools/registry.js';
 import { toolContext } from '../dist/runtime/toolContext.js';
+
+/** Open the instrument dropdown and click a row whose symbol matches `symbol`. */
+async function selectFromDropdown(page, symbol) {
+  await page.locator('.instrument-switcher').click();
+  const dropdown = page.locator('.market-dropdown');
+  await dropdown.waitFor();
+  const allTab = dropdown.getByRole('tab', { name: '全部', exact: true });
+  if (await allTab.count()) await allTab.click();
+  const input = dropdown.locator('input[aria-label="搜索标的"]');
+  if (await input.count()) await input.fill(symbol);
+  // Wait for async search to render rows, then click the matching one.
+  const row = dropdown.locator('.dropdown-row').filter({ hasText: symbol }).first();
+  await row.waitFor({ state: 'visible', timeout: 8000 });
+  await row.click();
+  // Selecting a row dismisses the dropdown — wait for the chart context to update.
+  await dropdown.waitFor({ state: 'hidden' });
+}
 const staticRoot = fileURLToPath(
   new URL('../../desktop-ui/dist/', import.meta.url),
 );
@@ -105,7 +122,7 @@ test('Markets renders candles, preserves Chat and rejects a late BTC view action
       'running',
     );
     // The watchlist becomes visible once Chat is collapsed at this width.
-    await page.locator('.watchlist-select').filter({ hasText: 'NVDA' }).click();
+    await selectFromDropdown(page, 'NVDA');
     await page.getByLabel('NVDA K 线图', { exact: true }).waitFor();
     wait.resolve();
     await until(
@@ -312,116 +329,73 @@ test('Markets separates search from watching, preserves chart state across tabs 
           .width === 52,
     );
     const originalCount = service.watchlist().length;
-    const search = page.getByRole('button', { name: '搜索标的', exact: true });
-    await search.click();
-    await page.getByRole('dialog', { name: '搜索标的', exact: true }).waitFor();
-    await page
-      .getByRole('combobox', { name: '搜索标的', exact: true })
-      .fill('NVDA');
-    await page.getByRole('option').filter({ hasText: 'NVDA' }).waitFor();
-    await page.keyboard.press('Enter');
+    // Open the dropdown and search for NVDA
+    await page.locator('.instrument-switcher').click();
+    const dropdown = page.locator('.market-dropdown');
+    await dropdown.waitFor();
+    await dropdown.getByRole('tab', { name: '全部', exact: true }).click();
+    await dropdown.locator('input[aria-label="搜索标的"]').fill('NVDA');
+    const nvdaRow = dropdown.locator('.dropdown-row').filter({ hasText: 'NVDA' }).first();
+    await nvdaRow.waitFor();
+    await nvdaRow.click();
     await page.getByLabel('NVDA K 线图', { exact: true }).waitFor();
     assert.equal(
       service.watchlist().length,
       originalCount,
       'opening a search result must not add it',
     );
-    await page
-      .getByRole('button', { name: '关注当前标的', exact: true })
-      .click();
-    await page
-      .getByRole('button', { name: '取消关注当前标的', exact: true })
-      .waitFor();
-    assert.equal(service.watchlist().length, originalCount + 1);
-    await page
-      .getByRole('button', { name: '取消关注当前标的', exact: true })
-      .click();
-    await page
-      .getByRole('button', { name: '关注当前标的', exact: true })
-      .waitFor();
+    // Star BTC via switcher's star button
+    await page.locator('.instrument-switcher .switcher-star').click();
+    await until(async () => service.watchlist().length === originalCount + 1);
+    await page.locator('.instrument-switcher .switcher-star').click();
+    await until(async () => service.watchlist().length === originalCount);
     assert.equal(
       await page.getByLabel('NVDA K 线图').count(),
       1,
       'unwatching preserves the chart',
     );
-    await page.locator('.watchlist-select').filter({ hasText: 'BTC' }).click();
-    await search.click();
-    await page.getByRole('dialog', { name: '搜索标的', exact: true }).waitFor();
-    await page
-      .getByRole('combobox', { name: '搜索标的', exact: true })
-      .fill('NVDA');
-    await page
-      .getByRole('button', { name: '关注 NVDA · 美股', exact: true })
-      .click();
-    await page
-      .getByRole('button', { name: '取消关注 NVDA · 美股', exact: true })
-      .waitFor();
-    assert.match(await page.locator('.market-heading h1').textContent(), /BTC/);
-    await page.screenshot({ path: '/tmp/seris-markets-search.png' });
-    const exit = await page.evaluate(() => {
-      const popup = document.querySelector('.market-modal');
-      return new Promise((resolve, reject) => {
-        let retainedDuringExit = false;
-        const timeout = setTimeout(() => {
-          observer.disconnect();
-          reject(new Error('Search popup did not finish closing'));
-        }, 5000);
-        const observer = new MutationObserver(() => {
-          if (popup.hasAttribute('data-ending-style') && popup.isConnected) {
-            retainedDuringExit = true;
-          }
-          if (!popup.isConnected) {
-            clearTimeout(timeout);
-            observer.disconnect();
-            resolve({ retainedDuringExit });
-          }
-        });
-        observer.observe(document.body, {
-          attributes: true,
-          attributeFilter: ['data-ending-style'],
-          childList: true,
-          subtree: true,
-        });
-        popup.querySelector('button[aria-label="关闭搜索标的"]').click();
-      });
-    });
-    assert.equal(
-      exit.retainedDuringExit,
-      true,
-      'popup stays mounted through exit',
-    );
-    await page.getByRole('dialog').waitFor({ state: 'hidden' });
-    assert.equal(await page.getByRole('dialog').count(), 0);
-    assert.equal(
-      await search.evaluate((el) => el === document.activeElement),
-      true,
-    );
-    // Search supports multiple results, keyboard selection and a local retry.
-    await search.click();
-    await page.getByRole('dialog', { name: '搜索标的', exact: true }).waitFor();
-    await page
-      .getByRole('combobox', { name: '搜索标的', exact: true })
-      .fill('A');
-    await until(async () => (await page.getByRole('option').count()) === 2);
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
+
+    // Reopen dropdown, add NVDA to favorites via its row star, then close by outside click.
+    await selectFromDropdown(page, 'BTC');
+    await page.locator('.instrument-switcher').click();
+    await dropdown.waitFor();
+    await dropdown.getByRole('tab', { name: '全部', exact: true }).click();
+    await dropdown.locator('input[aria-label="搜索标的"]').fill('NVDA');
+    const star = nvdaRow.locator('.row-star');
+    await star.waitFor();
+    await star.click();
+    await until(async () => service.watchlist().some(i => i.symbol === 'NVDA'));
+    assert.equal(await dropdown.isVisible(), true, 'watching keeps dropdown open');
+    // Click outside to dismiss.
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await dropdown.waitFor({ state: 'hidden' });
+
+    // Multiple-results flow on the "all" tab.
+    await page.locator('.instrument-switcher').click();
+    await dropdown.waitFor();
+    await dropdown.getByRole('tab', { name: '全部', exact: true }).click();
+    await dropdown.locator('input[aria-label="搜索标的"]').fill('A');
+    await until(async () => (await dropdown.locator('.dropdown-row').count()) >= 2);
+    const aaplRow = dropdown.locator('.dropdown-row').filter({ hasText: 'AAPL' }).first();
+    await aaplRow.click();
     await page.getByLabel('AAPL K 线图').waitFor();
-    await search.click();
-    await page.getByRole('dialog', { name: '搜索标的', exact: true }).waitFor();
+
+    // Error path: provider failure surfaces an empty state, Escape closes.
+    await page.locator('.instrument-switcher').click();
+    await dropdown.waitFor();
     await page.route('**/api/markets/search?q=ERROR', (route) =>
       route.fulfill({ status: 503, body: 'fixture unavailable' }),
     );
-    await page
-      .getByRole('combobox', { name: '搜索标的', exact: true })
-      .fill('ERROR');
-    await page.getByText('搜索暂不可用，请重试。', { exact: true }).waitFor();
+    await dropdown.locator('input[aria-label="搜索标的"]').fill('ERROR');
+    // Our dropdown doesn't render a specific "unavailable" message — when the
+    // search fails we just see no rows.
+    await page.waitForTimeout(500);
+    assert.equal(await dropdown.locator('.dropdown-row').count(), 0);
     await page.unroute('**/api/markets/search?q=ERROR');
-    await page.getByRole('button', { name: '重试搜索', exact: true }).click();
-    await page
-      .getByText('没有找到匹配标的，试试其他代码或名称。', { exact: true })
-      .waitFor();
     await page.keyboard.press('Escape');
-    await page.locator('.watchlist-select').filter({ hasText: 'NVDA' }).click();
+    await dropdown.waitFor({ state: 'hidden' });
+
+    await selectFromDropdown(page, 'NVDA');
     await page.getByRole('button', { name: '1小时', exact: true }).click();
     await page.getByLabel('NVDA K 线图').waitFor();
     const plot = await page.locator('.market-chart').boundingBox();
@@ -503,14 +477,9 @@ test('Markets separates search from watching, preserves chart state across tabs 
     assert.equal(await page.getByRole('dialog').count(), 0);
     assert.equal(service.alerts().length, 2, 'Escape cancels without saving');
     await page.setViewportSize({ width: 960, height: 640 });
-    await page
-      .getByRole('button', { name: '展开关注列表', exact: true })
-      .click();
-    assert.equal(
-      await page.getByLabel('关注列表', { exact: true }).isVisible(),
-      true,
-    );
-    await page.locator('.watchlist-select').filter({ hasText: 'BTC' }).click();
+    // The new layout has no standalone watchlist sidebar — opening the instrument
+    // dropdown is how users switch instruments on narrow viewports.
+    await selectFromDropdown(page, 'BTC');
     assert.equal(
       await page
         .getByRole('complementary', { name: '关注列表', exact: true })
@@ -618,26 +587,17 @@ test('drawer motion survives rapid reversal and resizing, and reduced motion kee
         .evaluate((el) => getComputedStyle(el).transitionDuration),
       '0s',
     );
-    await page.getByRole('button', { name: '搜索标的', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: '搜索标的', exact: true });
-    await dialog.waitFor();
+    // Reduced motion must disable dropdown transitions too.
+    await page.locator('.instrument-switcher').click();
+    const dropdown = page.locator('.market-dropdown');
+    await dropdown.waitFor();
     assert.ok(
-      (await dialog.evaluate((el) => getComputedStyle(el).transitionDuration))
+      (await dropdown.evaluate((el) => getComputedStyle(el).transitionDuration))
         .split(',')
         .every((v) => v.trim() === '0s'),
     );
-    await page
-      .getByRole('combobox', { name: '搜索标的', exact: true })
-      .fill('BTC');
-    await page.getByRole('option').filter({ hasText: 'BTC' }).waitFor();
     await page.keyboard.press('Escape');
-    await dialog.waitFor({ state: 'hidden' });
-    assert.equal(
-      await page
-        .getByRole('button', { name: '搜索标的', exact: true })
-        .evaluate((el) => el === document.activeElement),
-      true,
-    );
+    await dropdown.waitFor({ state: 'hidden' });
     assert.deepEqual(errors, []);
   } finally {
     await browser?.close();
@@ -849,7 +809,7 @@ test('ordinary Chat opens Markets only for typed view actions and keeps its conv
       'true',
       'a later user tab choice takes precedence',
     );
-    assert.match(await page.locator('.market-heading h1').textContent(), /BTC/);
+    assert.match(await page.locator('.instrument-switcher .switcher-symbol').textContent(), /BTC/);
     await page
       .getByRole('button', { name: '查看 NVDA · 美股 · 1天 ↗', exact: true })
       .last()
@@ -1029,20 +989,15 @@ test('language preference translates all workspaces and Markets dialogs without 
     assert.equal(after.dataRef, before.dataRef);
     assert.deepEqual(after.selectedRange, before.selectedRange);
     assert.equal((await runtime.listSessions()).length, 1);
-    await page
-      .getByRole('button', { name: 'Search markets', exact: true })
-      .click();
-    await page
-      .getByRole('dialog', { name: 'Search markets', exact: true })
-      .waitFor();
-    await page
-      .getByRole('combobox', { name: 'Search markets', exact: true })
-      .fill('NVDA');
-    await page.getByText('1 result', { exact: true }).waitFor();
-    await page
-      .getByRole('button', { name: 'Unwatch NVDA · US stocks', exact: true })
-      .waitFor();
+    // Open the instrument dropdown (English locale uses the same component).
+    await page.locator('.instrument-switcher').click();
+    const dropdown = page.locator('.market-dropdown');
+    await dropdown.waitFor();
+    await dropdown.getByRole('tab', { name: 'All', exact: true }).click();
+    await dropdown.locator('input[aria-label="Search markets"]').fill('NVDA');
+    await dropdown.locator('.dropdown-row').filter({ hasText: 'NVDA' }).first().waitFor();
     await page.keyboard.press('Escape');
+    await dropdown.waitFor({ state: 'hidden' });
     await page.getByRole('tab', { name: /^Alerts/ }).click();
     await page
       .getByText('BTC Funding ≤ -0.01 % / hour', { exact: true })

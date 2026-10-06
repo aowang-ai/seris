@@ -706,53 +706,112 @@ button:disabled {
   font-size: 11px;
   color: var(--muted-foreground);
 }
+
+/* Minara-style table row: icon | symbol(+lev) | price | change | funding | OI | ×
+   Column widths tuned to fit a 230px-wide sidebar. */
+.watchlist-col-headers {
+  display: grid;
+  grid-template-columns: 28px 1fr 68px 56px 56px 64px 16px;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 8px 6px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
 .watchlist-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px 1fr 68px 56px 56px 64px 16px;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: inherit;
   border-radius: 7px;
   position: relative;
+}
+.watchlist-row:hover {
+  background: var(--hover, rgba(128,128,128,.07));
 }
 .watchlist-row.selected {
   background: var(--secondary);
 }
-.watchlist-select {
-  width: 100%;
-  text-align: left;
-  padding: 10px 8px;
-  min-width: 0;
-}
-.watchlist-select > div {
+.watchlist-cell {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.watchlist-icon img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.watchlist-symbol {
   gap: 5px;
 }
-.watchlist-select strong {
+.watchlist-symbol strong {
   font-size: 12px;
   font-weight: 500;
 }
-.watchlist-select small {
+.watchlist-leverage {
   font-size: 9px;
-}
-.watchlist-select > div + div {
-  margin-top: 5px;
+  padding: 1px 4px;
   color: var(--muted-foreground);
+  background: var(--muted, rgba(128,128,128,.15));
+  border-radius: 3px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+.watchlist-price {
+  justify-content: flex-end;
+  font-size: 11px;
+  font-weight: 500;
+}
+.watchlist-change {
+  justify-content: flex-end;
+  font-size: 10px;
+  font-weight: 500;
+}
+.watchlist-change.up { color: #38a88c; }
+.watchlist-change.down { color: #dc777b; }
+.watchlist-funding {
+  justify-content: flex-end;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.watchlist-oi {
+  justify-content: flex-end;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.watchlist-remove {
+  justify-content: center;
+  font-size: 14px;
+  color: var(--muted-foreground);
+  opacity: 0;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+.watchlist-row:hover .watchlist-remove,
+.watchlist-remove:focus {
+  opacity: 1;
 }
 .watchlist-error {
   display: block;
   color: var(--muted-foreground);
   margin-top: 4px;
-}
-.watchlist-remove {
-  position: absolute;
-  right: 2px;
-  top: 2px;
-  opacity: 0;
-  color: var(--muted-foreground);
-  padding: 1px 4px;
   font-size: 10px;
-}
-.watchlist-row:hover .watchlist-remove,
-.watchlist-remove:focus {
-  opacity: 1;
 }
 .market-connection {
   margin-top: auto;
@@ -1820,3 +1879,225 @@ button:disabled {
 }
 .backtest-chart-price { height: 320px; }
 .backtest-chart-equity { height: 140px; }
+
+/* InstrumentInfoBar — top strip above the chart, Minara style */
+.instrument-info-bar-anchor {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.instrument-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 12px;
+  width: 100%;
+  overflow: hidden;
+}
+.instrument-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.instrument-switcher:hover {
+  background: var(--hover, rgba(128,128,128,.07));
+}
+.switcher-star {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+.switcher-star.active { color: #eab308; }
+.switcher-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: block;
+}
+.switcher-symbol {
+  font-size: 14px;
+  font-weight: 600;
+}
+.switcher-arrow {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  line-height: 1;
+}
+.info-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.info-cell small {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.info-cell strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.info-cell strong.up { color: #38a88c; }
+.info-cell strong.down { color: #dc777b; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* MarketDropdown — anchored dropdown below the switcher */
+.market-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 40;
+  margin-top: 6px;
+  width: min(720px, calc(100vw - 32px));
+  max-height: min(72vh, 560px);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.18), 0 2px 8px rgba(0,0,0,.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.market-dropdown .dropdown-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.market-dropdown .dropdown-search svg { color: var(--muted-foreground); flex-shrink: 0; }
+.market-dropdown .dropdown-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font: inherit;
+  color: inherit;
+  font-size: 13px;
+}
+.market-dropdown .dropdown-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.market-dropdown .dropdown-tabs button {
+  border: none;
+  background: transparent;
+  color: var(--muted-foreground);
+  padding: 4px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  border-radius: 4px;
+}
+.market-dropdown .dropdown-tabs button.active,
+.market-dropdown .dropdown-tabs button[aria-selected='true'] {
+  color: var(--text, inherit);
+  background: var(--muted, rgba(128,128,128,.12));
+  font-weight: 500;
+}
+.market-dropdown .dropdown-header {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 92px 74px 84px 92px;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.market-dropdown .dropdown-rows {
+  overflow-y: auto;
+  flex: 1;
+}
+.market-dropdown .dropdown-status {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.dropdown-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 92px 74px 84px 92px;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  border-bottom: 1px solid var(--border-light, rgba(128,128,128,.08));
+}
+.dropdown-row:hover {
+  background: var(--hover, rgba(128,128,128,.06));
+}
+.dropdown-row.selected {
+  background: var(--secondary);
+}
+.dropdown-row .col-symbol {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+.dropdown-row .col-symbol strong {
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dropdown-row .row-name {
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
+}
+.dropdown-row .col-symbol img {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.row-leverage {
+  font-size: 9px;
+  font-style: normal;
+  padding: 1px 4px;
+  color: var(--muted-foreground);
+  background: var(--muted, rgba(128,128,128,.15));
+  border-radius: 3px;
+  font-weight: 400;
+}
+.row-star {
+  color: var(--muted-foreground);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  font-size: 13px;
+}
+.row-star.active { color: #eab308; }
+.dropdown-row .col-price { justify-content: flex-end; font-size: 12px; font-weight: 500; text-align: right; }
+.dropdown-row .col-change { justify-content: flex-end; font-size: 11.5px; font-weight: 500; text-align: right; }
+.dropdown-row .col-funding { justify-content: flex-end; font-size: 11px; color: var(--muted-foreground); text-align: right; }
+.dropdown-row .col-oi { justify-content: flex-end; font-size: 11px; color: var(--muted-foreground); text-align: right; }
+.dropdown-row .col-change.up { color: #38a88c; }
+.dropdown-row .col-change.down { color: #dc777b; }

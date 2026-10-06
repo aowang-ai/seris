@@ -240,6 +240,9 @@ importers:
       '@tauri-apps/plugin-opener':
         specifier: ^2.7.0
         version: 2.7.0
+      cryptocurrency-icons:
+        specifier: ^0.18.1
+        version: 0.18.1
       lightweight-charts:
         specifier: 5.2.1
         version: 5.2.1
@@ -1405,6 +1408,9 @@ packages:
   cron-parser@5.10.1:
     resolution: {integrity: sha512-pKRrRagItwk9rGIStcUyMxFX34x56zoX3KDf9HJ4ttwkXIK1qxK63EvXvEDmlxI9AdPJ+Y7TEKRftRlW5eSS7A==}
     engines: {node: '>=18'}
+
+  cryptocurrency-icons@0.18.1:
+    resolution: {integrity: sha512-dvR5O8JOmav3559Yb0Igpkia+3vpt/aeNvMu5ZIVUG2Bzpq9wNcOJRIQas49XJrPjtZ98GAEn3aDQO+w7uhS2w==}
 
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
@@ -3295,6 +3301,8 @@ snapshots:
   cron-parser@5.10.1:
     dependencies:
       luxon: 3.7.2
+
+  cryptocurrency-icons@0.18.1: {}
 
   csstype@3.2.3: {}
 
