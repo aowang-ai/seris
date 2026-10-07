@@ -1,68 +1,113 @@
-# Seris
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="apps/desktop-ui/public/brand/logos/wordmark-on-dark.svg">
+    <img src="apps/desktop-ui/public/brand/logos/wordmark-on-light.svg" alt="Seris" width="180">
+  </picture>
+</p>
 
-**An AI market research assistant for your desktop.**
+<h1 align="center">Your AI market research desk.</h1>
 
-Seris connects conversation with a market workspace. Follow crypto, stocks, ETFs, commodities, FX and indices, inspect candlestick charts, and ask an agent to analyze what you are looking at or set a price alert.
+<p align="center">
+  Talk through a market move, open its chart, and turn an idea into a local backtest.<br>
+  An open-source desktop app for researching crypto, stocks, ETFs, commodities, FX and indices.
+</p>
 
-**Status: 0.1.0 stable.** This release supports Chat, Markets, model settings and local strategy backtests on macOS Apple Silicon. Unfinished Automation and Portfolio pages and simulated account, trading and wallet tools are not exposed. Live order execution and wallet transfers are unavailable. Alerts run only while the app is running.
+<p align="center">
+  <a href="https://github.com/aowang-ai/seris/releases/latest"><strong>Download for macOS</strong></a> ·
+  <a href="#explore-the-markets">Watch the walkthrough</a> ·
+  <a href="#development">Build from source</a>
+</p>
 
-## Install
+<p align="center"><strong>v0.1.0 stable</strong> · macOS Apple Silicon · Apache-2.0</p>
 
-Download the Apple Silicon DMG from [Releases](https://github.com/aowang-ai/seris/releases). Open it and drag Seris to Applications. The app uses a complete ad-hoc signature and is not Apple-notarized. After the first blocked launch, go to **System Settings → Privacy & Security → Open Anyway** and approve Seris. See [Apple's instructions](https://support.apple.com/102445). Quit the old app before replacing it during an upgrade; conversations, watchlists, model configuration and user strategies remain in the application-data directory. A keychain prompt may ask you to authorize access to an existing model credential after an upgrade.
+![Seris showing a live BTC candlestick chart with AI analysis alongside it](.github/assets/workspace.png)
 
-## Features
+*The market workspace, with real Hyperliquid data and a response from a connected DeepSeek model. Captured in the released macOS client.*
 
-- **Chat:** persistent conversations, automatic titles, streaming responses and tool approvals.
-- **Markets:** watchlists, search, TradingView candlestick charts, news and conditional alerts. Open Chat alongside a chart and share the current instrument, interval and selected range.
-- **Models:** cloud providers, custom OpenAI/Anthropic-compatible endpoints, and model discovery from running Ollama or LM Studio servers.
-- **Strategies:** review AI-authored TypeScript strategies before saving, backtest against Binance spot candles, and inspect persisted metrics, fills and charts. User strategies survive application upgrades; older drafts are migrated from runtime caches on first launch.
-- **Settings:** English and Chinese interfaces, provider configuration and model selection. Desktop API keys are stored in the operating system credential store.
+## Research in one workspace
 
-## Run locally
+| What you want to do | How Seris helps |
+| --- | --- |
+| **Understand a market move** | Ask in Chat or alongside a chart. Share the current instrument, timeframe and selected range with the agent. |
+| **Follow your markets** | Search instruments, build a watchlist, switch candlestick intervals and set conditional price alerts. |
+| **Test a strategy idea** | Ask for a TypeScript strategy, review its source before saving, and backtest against historical Binance spot candles. |
+| **Use your preferred model** | Connect a cloud provider, a custom OpenAI/Anthropic-compatible endpoint, or a running Ollama or LM Studio server. |
 
-Use the Node version in [`.node-version`](.node-version), **pnpm 12.5.1**, Rust, and the Tauri build prerequisites for your operating system.
+Conversations, watchlists and saved strategies persist across app upgrades. The interface supports English and Chinese.
+
+## Explore the markets
+
+Search for an instrument, choose its market and change the chart timeframe.
+
+![A walkthrough of searching for NVDA, opening its Hyperliquid xyz perpetual chart and switching from 1h to 4h](.github/assets/markets-walkthrough.gif)
+
+*A shortened walkthrough of the actual client. NVDA is shown as a Hyperliquid xyz perpetual contract; quotes in this recording are historical snapshots.*
+
+Open the assistant beside a chart to discuss what you see. For example:
+
+> Summarize this chart in three short bullets.
+>
+> Compare BTC funding on Hyperliquid and Binance.
+>
+> Alert me when BTC crosses $90,000.
+
+## Inspect a strategy, then its results
+
+Review the strategy's code and parameters, then inspect its return, drawdown, fees, trade markers and equity curve. Backtest runs remain available in **Strategies**.
+
+![The Strategies page showing a BTCUSDT hourly backtest, performance metrics, trades and equity curve](.github/assets/backtest.png)
+
+*The bundled moving-average strategy, run locally against 999 closed Binance BTCUSDT hourly candles. These are simulated historical results.*
+
+Try this in Chat:
+
+> Write a BTC strategy that enters on a moving-average crossover and uses an ATR trailing stop.
+>
+> Backtest ma-trail-stop on BTCUSDT 1h for the last 30 days.
+
+## Get started
+
+1. **Install Seris.** Download the Apple Silicon DMG from [the latest release](https://github.com/aowang-ai/seris/releases/latest), open it, and drag Seris to Applications.
+2. **Connect a model.** Open **Settings → Models**, configure a provider and select a default model. For Ollama or LM Studio, start the local server first.
+3. **Start researching.** Ask in Chat, or open **Markets** and bring the assistant alongside your chart.
+
+**First launch on macOS:** Seris is ad-hoc signed and is not Apple-notarized. If macOS blocks the first launch, open **System Settings → Privacy & Security → Open Anyway** and approve Seris. See [Apple's instructions](https://support.apple.com/102445).
+
+For upgrades, quit the old app before replacing it. Your local data is retained; macOS may ask you to authorize access to an existing model credential again.
+
+## Models, data and local storage
+
+**Bring your own model.** Seris supports cloud providers and local models through Ollama or LM Studio, including custom endpoints. Model requests go to the provider you configure and use its pricing and data policies. Desktop API keys are saved in the operating system credential store.
+
+**Know the data source.** Public market data comes from Hyperliquid, Binance spot, Binance traditional-finance perpetuals and Hyperliquid xyz. Stock, ETF, commodity, FX and index instruments on perpetual venues show contract prices. For US stocks and ETFs, connect Longbridge from Markets and complete browser authorization; access depends on your account permissions. Crypto news requires `CRYPTOCOMPARE_API_KEY` in the startup environment.
+
+**Keep your workspace.** Conversations, watchlists, strategies and backtest results are stored locally. Approved browser and terminal tools can use your local environment; see [Security](SECURITY.md) for the permission model.
+
+**Release scope.** v0.1.0 supports Chat, Markets, model settings and local strategy backtests on macOS Apple Silicon. Alerts run while the app is running. Live order execution, wallet transfers and connected portfolio balances are unavailable. Windows, Linux and Intel Mac installers are not included in this release.
+
+## Development
+
+Use the Node version in [`.node-version`](.node-version), **pnpm 12.5.1**, Rust and the Tauri build prerequisites for your operating system.
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm tauri:dev
 ```
 
-Open **Settings → Models**, configure a provider and choose a default model. For local models, start Ollama or LM Studio first; Settings discovers models on their default ports, and supports custom endpoints. Testing a connection sends a short model request and may incur provider charges.
-
 ```bash
 pnpm typecheck
-pnpm test        # Offline regression checks; no live model or trading API calls
+pnpm test        # Offline regression checks
 pnpm tauri:build
 ```
 
-The supported desktop platform for 0.1.0 is macOS Apple Silicon. Windows, Linux and Intel Mac installers are not part of this release. See [Contributing](CONTRIBUTING.md) for additional checks and standalone gateway development.
-
-## Market data
-
-Market data uses public Hyperliquid perpetual, Binance spot, Binance USDT traditional-finance perpetual and Hyperliquid xyz APIs. Traditional-finance perpetuals cover supported stocks, ETFs, commodities, FX and indices; their quotes are contract prices. Use ticker codes when a venue does not support company-name searches. Funding rates are displayed as percentages per hour, with Binance settlement intervals applied before conversion. Availability depends on the source and region.
-
-US stocks and ETFs are also available through the official Longbridge SDK: connect from Markets and complete browser authorization. Data access depends on your account permissions; the market-data integration does not submit trades. Crypto news requires `CRYPTOCOMPARE_API_KEY` in the startup environment.
-
-Market views report missing data rather than inventing quotes or company information. US-stock alerts wait for fresh quotes when the latest quote is more than five minutes old.
-
-## Project structure
-
-| Directory | Purpose |
+| Directory | Role |
 | --- | --- |
-| `apps/core` | pi 1.0.2 agent runtime, gateway, tools, skills and persistent sessions |
-| `apps/desktop-ui` | React / Vite / Tailwind interface |
-| `apps/desktop` | Tauri / Rust shell, process supervision and desktop packaging |
+| [`apps/core`](apps/core) | Agent runtime, local gateway, tools, skills and persistent sessions |
+| [`apps/desktop-ui`](apps/desktop-ui) | React, Vite and Tailwind interface |
+| [`apps/desktop`](apps/desktop) | Tauri/Rust shell and desktop packaging |
 
-The desktop shell bundles Node and the core runtime. The UI connects to the local gateway over HTTP and SSE; `apps/core/src/protocol.ts` defines their shared protocol.
-
-## Local data
-
-Desktop data lives in the system application-data directory. The standalone gateway uses the working directory. Override these with `SERIS_DATA_DIR`; use `SERIS_WORKSPACE` for the agent's task directory. Sessions, state, installed skills and generated artifacts remain local and are excluded from Git. Internal development notes in `docs/` are also excluded.
-
-User strategies live in `skills/strategies/` within that data directory. Strategies can import types and indicator helpers from `@seris/strategy`; legacy relative SDK imports remain supported.
-
-Browser tools require Chrome or `SERIS_BROWSER_PATH`. Approved terminal actions run a full shell under your account; Node permission controls are not an operating system sandbox. Read [Security](SECURITY.md) for details.
+See [Contributing](CONTRIBUTING.md) for gateway development, local data paths and release checks. Found a problem? [Open an issue](https://github.com/aowang-ai/seris/issues) with your app version and reproduction steps.
 
 ## License
 
-Project-owned code and public documentation use [Apache-2.0](LICENSE). Seris branding has [separate terms](apps/desktop-ui/public/brand/LICENSE.md). Dependencies retain their own licenses.
+Project-owned code and public documentation use [Apache-2.0](LICENSE). Seris branding has [separate terms](apps/desktop-ui/public/brand/LICENSE.md); dependencies retain their own licenses.

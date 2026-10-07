@@ -20,6 +20,16 @@ pnpm core:gateway
 
 Standalone model credentials can be configured in the UI for the lifetime of the gateway, or through provider environment variables: `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`, `OPENAI_API_KEY`, `GEMINI_API_KEY` / `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`, `DEEPSEEK_API_KEY`, `MOONSHOT_API_KEY` / `MOONSHOT_CN_API_KEY`, and `KIMI_API_KEY`.
 
+## Architecture and local data
+
+The desktop shell bundles Node and the core runtime. The React UI connects to the local gateway over HTTP and SSE; [`apps/core/src/protocol.ts`](apps/core/src/protocol.ts) defines their shared protocol. The core uses the pi agent runtime.
+
+Desktop data lives in the system application-data directory. The standalone gateway uses the working directory. Override these with `SERIS_DATA_DIR`; use `SERIS_WORKSPACE` for the agent's task directory. Sessions, state, installed skills and generated artifacts remain local and are excluded from Git. Internal development notes in `docs/` are also excluded.
+
+User strategies live in `skills/strategies/` within that data directory. Strategies can import types and indicator helpers from `@seris/strategy`; legacy relative SDK imports remain supported. Older strategy drafts are migrated from runtime caches on first launch.
+
+Browser tools require Chrome or `SERIS_BROWSER_PATH`. Approved terminal actions run a full shell under your account; Node permission controls are not an operating system sandbox. See [Security](SECURITY.md) for details.
+
 ## Checks
 
 ```bash
