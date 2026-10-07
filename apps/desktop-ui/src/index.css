@@ -594,8 +594,19 @@ button:disabled {
   max-width: 768px;
   margin: 0 auto 6px;
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+}
+.composer-context-icon {
+  display: block;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.composer-context-symbol {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .market-action {
   font-size: 11px;

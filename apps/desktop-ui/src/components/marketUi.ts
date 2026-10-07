@@ -12,6 +12,8 @@ export const price = (v: number, locale?: string) =>
   v.toLocaleString(locale, { maximumFractionDigits: pricePrecision(v) });
 export const time = (v: number, locale?: string) =>
   new Date(v).toLocaleString(locale);
+export const fundingText = (pct: number | undefined) =>
+  pct == null || !Number.isFinite(pct) ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(4)}%`;
 export const venue = (i: Instrument, language: Language) => {
   if (i.venue === 'hyperliquid') return `Hyperliquid · ${translate(language, 'Perpetual')}`;
   if (i.venue === 'hyperliquid-xyz') {
@@ -54,7 +56,7 @@ export function alertLabel(
   );
   const unit =
     rule.metric === 'price'
-      ? rule.instrument.venue === 'binance'
+      ? ['binance', 'binance-tradifi'].includes(rule.instrument.venue)
         ? 'USDT'
         : 'USD'
       : rule.metric === 'changePct'

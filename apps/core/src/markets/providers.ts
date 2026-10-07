@@ -23,6 +23,7 @@ import { fetchJson } from '../tools/registry.js';
 import { getKlinesTool } from '../tools/market-data.js';
 import { hlPerpSnapshotTool } from '../tools/hyperliquid.js';
 import { cryptoNewsTool } from '../tools/data-sources.js';
+import { traditionalKind } from './instruments.js';
 import {
   parseInstrument,
   type Instrument,
@@ -276,31 +277,59 @@ const intervalMs: Record<MarketInterval, number> = {
   '1w': 604800000,
 };
 
-/** Map an xyz dex short name to a Seris kind. Used by the search provider. */
-function classifyXyzKind(name: string): 'stock' | 'etf' | 'commodity' | 'forex' | 'index' {
-  const COMMODITIES = new Set(['GOLD','SILVER','CL','BRENTOIL','NATGAS','COPPER','PLATINUM','PALLADIUM','URANIUM','WHEAT','CORN','HO','ALUMINIUM']);
-  const FX = new Set(['EUR','JPY','GBP','KRW']);
-  const INDICES = new Set([
-    'SP500','XYZ100','DXY','VIX','NIFTY','IBOV','JP225','KR200',
-    'MAGS','TOTAL2','MAG7','US500','USA500','SMALL2000','BTCD','AVGO','H100',
-    'SEMIS','ES','ESP','TQQQ','SQQQ','SOXL',
-  ]);
-  const ETFS = new Set(['TLT','XBI','XLE','URNM','EWJ','EWT','EWY','EWZ','SMH','XLU','IWM','SPY','QQQ']);
-  if (COMMODITIES.has(name)) return 'commodity';
-  if (FX.has(name)) return 'forex';
-  if (INDICES.has(name)) return 'index';
-  if (ETFS.has(name)) return 'etf';
-  // Default: individual equities (NVDA, TSLA, AAPL, SMSN, SKHY, TSM, etc.)
-  return 'stock';
-}
+interface XyzMeta { name: string; maxLeverage?: number; isDelisted?: boolean }
+interface XyzData { at: number; universe: XyzMeta[]; contexts: Record<string, unknown>[] }
 export class PublicMarketProvider implements MarketProvider {
   readonly longbridge = new LongbridgeData();
   private universe?: { at: number; coins: Array<{ name: string; maxLeverage?: number }> };
-  private tradifi?: { at: number; symbols: Array<{ symbol: string; baseAsset: string }> };
+  private tradifi?: { at: number; symbols: Array<{ symbol: string; baseAsset: string; underlyingType?: string }> };
   private xyzUniverse?: {
     at: number;
     entries: Array<{ name: string; maxLeverage?: number }>;
   };
+  private xyzData?: XyzData;
+  private xyzPending?: Promise<XyzData>;
+  private fundingInfo?: { at: number; intervals: Map<string, number> };
+  private fundingPending?: Promise<Map<string, number>>;
+  private async xyzContext(instrument: Instrument) {
+    if (!this.xyzData || Date.now() - this.xyzData.at > 30000) {
+      this.xyzPending ??= json('https://api.hyperliquid.xyz/info', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'metaAndAssetCtxs', dex: 'xyz' }),
+      }).then((data) => {
+        if (!Array.isArray(data?.[0]?.universe) || !Array.isArray(data?.[1]))
+          throw new Error('Invalid xyz market data');
+        return this.xyzData = { at: Date.now(), universe: data[0].universe, contexts: data[1] };
+      }).finally(() => { this.xyzPending = undefined; });
+      await this.xyzPending;
+    }
+    const data = this.xyzData!;
+    const index = data.universe.findIndex((entry) => entry.name === instrument.providerSymbol);
+    if (index < 0 || data.universe[index].isDelisted)
+      throw new Error(`xyz market is unavailable or delisted: ${instrument.providerSymbol}`);
+    if (!data.contexts[index]) throw new Error(`xyz has no quote for ${instrument.providerSymbol}`);
+    return { context: data.contexts[index], at: data.at };
+  }
+  private async fundingInterval(symbol: string): Promise<number> {
+    if (!this.fundingInfo || Date.now() - this.fundingInfo.at > 300000) {
+      this.fundingPending ??= json('https://fapi.binance.com/fapi/v1/fundingInfo')
+        .then((rows) => {
+          if (!Array.isArray(rows)) throw new Error('Invalid Binance funding intervals');
+          const intervals = new Map<string, number>();
+          for (const row of rows) {
+            const hours = finite(row.fundingIntervalHours);
+            if (typeof row.symbol !== 'string' || hours == null || hours <= 0 || hours > 24)
+              throw new Error('Invalid Binance funding interval');
+            intervals.set(row.symbol, hours);
+          }
+          this.fundingInfo = { at: Date.now(), intervals };
+          return intervals;
+        }).finally(() => { this.fundingPending = undefined; });
+      await this.fundingPending;
+    }
+    // fundingInfo lists adjusted contracts; unlisted contracts use the default 8h interval.
+    return this.fundingInfo!.intervals.get(symbol) ?? 8;
+  }
   async search(query: string): Promise<Instrument[]> {
     const q = query.trim().toUpperCase();
     if (!q) return [];
@@ -410,6 +439,7 @@ export class PublicMarketProvider implements MarketProvider {
               symbols: rows.map((s: any) => ({
                 symbol: s.symbol,
                 baseAsset: s.baseAsset,
+                underlyingType: s.underlyingType,
               })),
             };
           }
@@ -420,10 +450,9 @@ export class PublicMarketProvider implements MarketProvider {
                 x.symbol === spotSymbol ||
                 x.baseAsset.startsWith(q),
             )
+            .sort((a, b) => Number(b.baseAsset === q || b.symbol === q) - Number(a.baseAsset === q || a.symbol === q))
             .slice(0, 8)) {
-            const kind = ['SPY', 'QQQ', 'TQQQ', 'SQQQ', 'ESP'].includes(s.baseAsset)
-              ? ('etf' as const)
-              : ('stock' as const);
+            const kind = traditionalKind(s.baseAsset, s.underlyingType);
             try {
               results.push(
                 parseInstrument({
@@ -452,7 +481,7 @@ export class PublicMarketProvider implements MarketProvider {
             });
             this.xyzUniverse = {
               at: Date.now(),
-              entries: (meta.universe ?? []).map((u: any) => ({
+              entries: (meta.universe ?? []).filter((u: any) => !u.isDelisted).map((u: any) => ({
                 name: u.name as string,
                 maxLeverage: u.maxLeverage as number | undefined,
               })),
@@ -461,9 +490,10 @@ export class PublicMarketProvider implements MarketProvider {
           const query = q.toUpperCase();
           for (const entry of this.xyzUniverse.entries
             .filter((e) => e.name.toUpperCase().includes(query))
+            .sort((a, b) => Number(b.name === `xyz:${q}`) - Number(a.name === `xyz:${q}`))
             .slice(0, 12)) {
             const shortName = entry.name.replace(/^xyz:/, '');
-            const kind = classifyXyzKind(shortName);
+            const kind = traditionalKind(shortName);
             try {
               results.push(
                 parseInstrument({
@@ -499,7 +529,10 @@ export class PublicMarketProvider implements MarketProvider {
         providerSymbol: `${symbol}.US`,
       });
     }
-    return results.sort((a, b) => a.venue.localeCompare(b.venue)).slice(0, 20);
+    return results.sort((a, b) =>
+      Number(b.symbol === q || b.providerSymbol === q) - Number(a.symbol === q || a.providerSymbol === q)
+      || a.venue.localeCompare(b.venue),
+    ).slice(0, 20);
   }
   async quote(instrument: Instrument): Promise<MarketQuote> {
     if (instrument.venue === 'hyperliquid') {
@@ -539,16 +572,18 @@ export class PublicMarketProvider implements MarketProvider {
       };
     }
     if (instrument.venue === 'binance-tradifi') {
-      const [ticker, premium] = await Promise.allSettled([
+      const [ticker, premium, interval] = await Promise.allSettled([
         json(
           `https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${encodeURIComponent(instrument.providerSymbol)}`,
         ),
         json(
           `https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${encodeURIComponent(instrument.providerSymbol)}`,
         ),
+        this.fundingInterval(instrument.providerSymbol),
       ]);
       const t = ticker.status === 'fulfilled' ? ticker.value : null;
       const p = premium.status === 'fulfilled' ? premium.value : null;
+      const funding = finite(p?.lastFundingRate);
       if (!t) throw new Error('Binance tradifi quote unavailable');
       return {
         instrument,
@@ -561,50 +596,29 @@ export class PublicMarketProvider implements MarketProvider {
         time: Number(t.closeTime),
         fetchedAt: Date.now(),
         changePeriod: '24h',
-        fundingHourlyPct: p?.lastFundingRate ? Number(p.lastFundingRate) * 100 : undefined,
+        fundingHourlyPct: funding != null && interval.status === 'fulfilled'
+          ? funding * 100 / interval.value : undefined,
         openInterestUsd: undefined,
       };
     }
     if (instrument.venue === 'hyperliquid-xyz') {
-      const [mids, funding] = await Promise.allSettled([
-        json('https://api.hyperliquid.xyz/info', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ type: 'allMids', dex: 'xyz' }),
-        }),
-        json('https://api.hyperliquid.xyz/info', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            type: 'fundingHistory',
-            coin: instrument.providerSymbol,
-            startTime: Date.now() - 86400000,
-          }),
-        }),
-      ]);
-      if (mids.status !== 'fulfilled') throw new Error('xyz mids unavailable');
-      const markStr = mids.value?.[instrument.providerSymbol];
-      if (!markStr) throw new Error(`xyz has no quote for ${instrument.providerSymbol}`);
-      const price = parseFloat(markStr);
-      let fundingHourlyPct: number | undefined;
-      if (funding.status === 'fulfilled' && Array.isArray(funding.value) && funding.value.length > 0) {
-        const latest = funding.value[funding.value.length - 1];
-        const rate = parseFloat(latest?.fundingRate ?? '0');
-        if (Number.isFinite(rate)) fundingHourlyPct = rate * 100;
-      }
+      const { context: ctx, at } = await this.xyzContext(instrument);
+      const price = finite(ctx.markPx), previous = finite(ctx.prevDayPx);
+      if (price == null || price <= 0) throw new Error('Invalid xyz mark price');
+      const funding = finite(ctx.funding), interest = finite(ctx.openInterest);
       return {
         instrument,
         price,
         currency: 'USD',
-        changePct: null,
-        volume: null,
+        changePct: previous != null && previous > 0 ? (price / previous - 1) * 100 : null,
+        volume: finite(ctx.dayNtlVlm),
         source: 'Hyperliquid xyz',
         priceType: 'mark',
-        time: Date.now(),
-        fetchedAt: Date.now(),
+        time: at,
+        fetchedAt: at,
         changePeriod: '24h',
-        fundingHourlyPct,
-        openInterestUsd: undefined,
+        fundingHourlyPct: funding == null ? undefined : funding * 100,
+        openInterestUsd: interest == null ? undefined : interest * price,
       };
     }
     const { quotes } = await this.longbridge.context();
@@ -691,6 +705,7 @@ export class PublicMarketProvider implements MarketProvider {
       };
     }
     if (instrument.venue === 'hyperliquid-xyz') {
+      await this.xyzContext(instrument);
       const end = Date.now();
       const rows = await json('https://api.hyperliquid.xyz/info', {
         method: 'POST',

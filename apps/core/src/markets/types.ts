@@ -30,6 +30,7 @@ export interface MarketQuote {
   fetchedAt: number;
   changePeriod: '24h' | 'session';
   session?: string;
+  /** Percentage per hour, already multiplied by 100 (0.01 means 0.01%). */
   fundingHourlyPct?: number;
   openInterestUsd?: number;
 }
@@ -148,7 +149,7 @@ export function isInstrument(v: unknown): v is Instrument {
   if (v.venue === 'binance-tradifi')
     return (
       v.kind !== 'crypto' &&
-      /^[A-Z][A-Z0-9]{1,15}USDT$/.test(v.providerSymbol) &&
+      /^[A-Z][A-Z0-9]{0,15}USDT$/.test(v.providerSymbol) &&
       v.id === `binance-tradifi:${v.providerSymbol}`
     );
   if (v.venue === 'hyperliquid-xyz')
@@ -287,5 +288,10 @@ export function isMarketAction(v: unknown): v is MarketAction {
   );
 }
 export function contextLabel(c: MarketContext): string {
-  return `${c.instrument.symbol} · ${c.instrument.venue === 'hyperliquid' ? '永续' : c.instrument.venue === 'binance' ? '现货' : c.instrument.kind === 'etf' ? 'ETF' : '美股'} · ${c.interval}`;
+  const venue = c.instrument.venue;
+  const label = venue === 'hyperliquid' ? '永续'
+    : venue === 'hyperliquid-xyz' ? 'Hyperliquid xyz 永续'
+    : venue === 'binance-tradifi' ? 'Binance USDT 永续'
+    : venue === 'binance' ? '现货' : c.instrument.kind === 'etf' ? 'ETF' : '美股';
+  return `${c.instrument.symbol} · ${label} · ${c.interval}`;
 }

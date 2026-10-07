@@ -43,7 +43,7 @@ const HALVING_MS = Date.UTC(2028, 3, 15); // month is 0-indexed
 onCandle(candles, ctx, p) {
   const bar = candles[candles.length - 1];
   const daysToHalving = (HALVING_MS - bar.time) / 86_400_000;
-  
+
   if (!ctx.position && daysToHalving > 0 && daysToHalving < 30) {
     // Enter 30 days before halving
     return { kind: 'enter-long', notional: ctx.cash * 0.5, reason: 'Pre-halving accumulation' };

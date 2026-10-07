@@ -20,7 +20,7 @@ import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useI18n } from '../i18n';
 import { seris } from '../seris';
 import type { Instrument, MarketQuote } from '../../../core/src/markets/types';
-import { price } from './marketUi';
+import { price, fundingText } from './marketUi';
 import btcIcon from 'cryptocurrency-icons/svg/color/btc.svg';
 import ethIcon from 'cryptocurrency-icons/svg/color/eth.svg';
 import solIcon from 'cryptocurrency-icons/svg/color/sol.svg';
@@ -78,11 +78,6 @@ function abbrevUsd(v: number): string {
   return `$${v.toFixed(0)}`;
 }
 
-function fmtFunding(pct: number | undefined): string {
-  if (pct == null) return '—';
-  return `${pct >= 0 ? '+' : ''}${(pct * 100).toFixed(4)}%`;
-}
-
 export interface MarketDropdownProps {
   open: boolean;
   onClose: (instrument?: Instrument) => void;
@@ -102,6 +97,9 @@ export function MarketDropdown(p: MarketDropdownProps): JSX.Element | null {
   const [searching, setSearching] = useState(false);
   const [all, setAll] = useState<Instrument[]>([]);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  useEffect(() => {
+    if (p.open && p.watchlist.length === 0) setTab('all');
+  }, [p.open, p.watchlist.length]);
 
   // Close on outside click / escape
   useEffect(() => {
@@ -206,7 +204,7 @@ export function MarketDropdown(p: MarketDropdownProps): JSX.Element | null {
         <span className="col-symbol">{t('Symbol')}</span>
         <span className="col-price">{t('Price')}</span>
         <span className="col-change">{t('24H')}</span>
-        <span className="col-funding">{t('Funding')}</span>
+        <span className="col-funding">{t('Funding / hour')}</span>
         <span className="col-oi">{t('OI')}</span>
       </div>
       <div className="dropdown-rows" role="listbox">
@@ -222,7 +220,6 @@ export function MarketDropdown(p: MarketDropdownProps): JSX.Element | null {
           const row = p.quotes[i.id];
           const change = row?.quote?.changePct;
           const watched = p.watchlist.some((w) => w.id === i.id);
-          const isHl = i.venue === 'hyperliquid';
           return (
             <button
               key={i.id}
@@ -268,10 +265,10 @@ export function MarketDropdown(p: MarketDropdownProps): JSX.Element | null {
                 {change == null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}%`}
               </span>
               <span className="col-funding tabular">
-                {isHl && row?.quote?.fundingHourlyPct != null ? fmtFunding(row.quote.fundingHourlyPct) : '—'}
+                {fundingText(row?.quote?.fundingHourlyPct)}
               </span>
               <span className="col-oi tabular">
-                {isHl && row?.quote?.openInterestUsd ? abbrevUsd(row.quote.openInterestUsd) : '—'}
+                {row?.quote?.openInterestUsd != null ? abbrevUsd(row.quote.openInterestUsd) : '—'}
               </span>
             </button>
           );

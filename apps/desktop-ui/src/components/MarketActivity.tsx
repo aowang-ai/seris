@@ -303,7 +303,7 @@ export function AlertEditor({
         >
           <option value="price">
             {t('Price')}
-            {instrument.venue === 'binance' ? 'USDT' : 'USD'}
+            {['binance', 'binance-tradifi'].includes(instrument.venue) ? 'USDT' : 'USD'}
           </option>
           <option value="changePct">{t('Change %')}</option>
           {instrument.venue === 'hyperliquid' && (

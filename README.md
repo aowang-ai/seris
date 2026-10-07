@@ -2,7 +2,7 @@
 
 **An AI trading assistant for your desktop.**
 
-Seris connects conversation with a market workspace. Follow crypto, US stocks and ETFs, inspect candlestick charts, and ask an agent to analyze what you are looking at or set a price alert.
+Seris connects conversation with a market workspace. Follow crypto, stocks, ETFs, commodities, FX and indices, inspect candlestick charts, and ask an agent to analyze what you are looking at or set a price alert.
 
 **Status: Beta.** Chat, Markets, model settings and Strategies are connected. Automation and Portfolio pages are prototypes. Trading and wallet tools marked as simulated do not execute real transactions. Alerts run only while the app is running.
 
@@ -39,7 +39,9 @@ macOS desktop builds have been validated. Windows and Linux installers still nee
 
 ## Market data
 
-Crypto prices use public Hyperliquid perpetual and Binance spot APIs. Availability depends on the source and region. US stocks and ETFs use the official Longbridge SDK: connect from Markets and complete browser authorization. Data access depends on your account permissions; the market-data integration does not submit trades. Crypto news requires `CRYPTOCOMPARE_API_KEY` in the startup environment.
+Market data uses public Hyperliquid perpetual, Binance spot, Binance USDT traditional-finance perpetual and Hyperliquid xyz APIs. Traditional-finance perpetuals cover supported stocks, ETFs, commodities, FX and indices; their quotes are contract prices. Use ticker codes when a venue does not support company-name searches. Funding rates are displayed as percentages per hour, with Binance settlement intervals applied before conversion. Availability depends on the source and region.
+
+US stocks and ETFs are also available through the official Longbridge SDK: connect from Markets and complete browser authorization. Data access depends on your account permissions; the market-data integration does not submit trades. Crypto news requires `CRYPTOCOMPARE_API_KEY` in the startup environment.
 
 Market views report missing data rather than inventing quotes or company information. US-stock alerts wait for fresh quotes when the latest quote is more than five minutes old.
 

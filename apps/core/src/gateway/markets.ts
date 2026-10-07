@@ -28,7 +28,7 @@ export async function marketRoute(
   }
   if (path === '/api/markets/search' && method === 'GET')
     return {
-      instruments: await service.provider.search(
+      instruments: await service.search(
         (url.searchParams.get('q') ?? '').slice(0, 80),
       ),
     };

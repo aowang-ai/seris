@@ -453,8 +453,8 @@ export function MarketsPanel(p: Props) {
       style={{ display: p.active ? undefined : 'none' }}
     >
       <div className="markets-topbar">
-        {instrument && (
-          <div className="instrument-info-bar-anchor">
+        <div className="instrument-info-bar-anchor">
+          {instrument ? (
             <InstrumentInfoBar
               instrument={instrument}
               quote={q}
@@ -466,19 +466,28 @@ export function MarketsPanel(p: Props) {
               }
               onOpenDropdown={() => setSearchOpen(!searchOpen)}
             />
-            <MarketDropdown
-              open={searchOpen}
-              onClose={(next) => {
-                setSearchOpen(false);
-                if (next) change(next);
-              }}
-              watchlist={state?.watchlist ?? []}
-              quotes={quotes}
-              onToggleWatch={toggleWatch}
-              selectedId={instrument.id}
-            />
-          </div>
-        )}
+          ) : (
+            <button
+              className="instrument-switcher"
+              aria-expanded={searchOpen}
+              aria-haspopup="dialog"
+              onClick={() => setSearchOpen(!searchOpen)}
+            >
+              {t('Search markets')}
+            </button>
+          )}
+          <MarketDropdown
+            open={searchOpen}
+            onClose={(next) => {
+              setSearchOpen(false);
+              if (next) change(next);
+            }}
+            watchlist={state?.watchlist ?? []}
+            quotes={quotes}
+            onToggleWatch={toggleWatch}
+            selectedId={instrument?.id}
+          />
+        </div>
         <button
           className="market-top-chat"
           ref={chatToggle}

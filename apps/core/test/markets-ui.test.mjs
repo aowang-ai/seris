@@ -188,7 +188,7 @@ test('Markets renders candles, preserves Chat and rejects a late BTC view action
           .getAttribute('aria-pressed')) === 'true',
     );
     assert.match(
-      await page.locator('.composer-context').textContent(),
+      await page.locator('.composer-context').getAttribute('title'),
       /NVDA.*1周/,
     );
     await page.getByLabel('消息', { exact: true }).fill('标注观察价位');
@@ -444,7 +444,7 @@ test('Markets separates search from watching, preserves chart state across tabs 
     assert.match(draft, /Fixture market news/);
     assert.match(draft, /https:\/\/example.com\/news/);
     assert.match(
-      await page.locator('.composer-context').textContent(),
+      await page.locator('.composer-context').getAttribute('title'),
       /NVDA.*1小时/,
     );
     await page.getByRole('tab', { name: /^提醒/ }).click();
@@ -980,10 +980,8 @@ test('language preference translates all workspaces and Markets dialogs without 
       await page.getByLabel('Message', { exact: true }).inputValue(),
       'Keep this draft / 保留草稿',
     );
-    assert.match(
-      await page.locator('.composer-context').innerText(),
-      /Selected range/,
-    );
+    assert.equal(await page.locator('.composer-context-symbol').innerText(), 'BTC');
+    assert.match(await page.locator('.composer-context').getAttribute('title'), /BTC.*Hyperliquid.*Perpetual.*1h/);
     const after = await send('Message', 'After language change');
     assert.equal(after.instrument.id, before.instrument.id);
     assert.equal(after.dataRef, before.dataRef);

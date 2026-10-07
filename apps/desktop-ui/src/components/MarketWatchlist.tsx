@@ -4,8 +4,7 @@
  * Columns (left to right):
  *   ⭐ | Symbol (icon + name + leverage tag) | Price | 24H Change | Funding | Volume | OI | ×
  *
- * Funding, Volume, OI only render for Hyperliquid perpetuals (the only venue
- * that provides them). Stocks/ETFs show "—". Volume and OI are abbreviated
+ * Unavailable Funding/OI metrics show "—". Volume and OI are abbreviated
  * ($1.85B style) to fit a narrow list.
  */
 
@@ -13,7 +12,7 @@ import { useI18n } from '../i18n';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import type { MarketsState } from '../seris';
 import type { Instrument, MarketQuote } from '../../../core/src/markets/types';
-import { price, openMarketLink } from './marketUi';
+import { price, openMarketLink, fundingText } from './marketUi';
 
 import btcIcon from 'cryptocurrency-icons/svg/color/btc.svg';
 import ethIcon from 'cryptocurrency-icons/svg/color/eth.svg';
@@ -71,11 +70,6 @@ function abbrevUsd(v: number): string {
   return `$${v.toFixed(0)}`;
 }
 
-function fmtFunding(pct: number | undefined): string {
-  if (pct === undefined || pct === null) return '—';
-  return `${pct >= 0 ? '+' : ''}${(pct * 100).toFixed(4)}%`;
-}
-
 interface Props {
   state?: MarketsState;
   quotes: Record<string, { quote?: MarketQuote; error?: string }>;
@@ -101,8 +95,8 @@ export function MarketWatchlist({
     easing: 'ease-out',
   });
 
-  // Only show Funding/OI columns if any row is Hyperliquid
-  const hasHyperliquid = state?.watchlist.some((i) => i.venue === 'hyperliquid');
+  const hasHyperliquid = state?.watchlist.some((i) =>
+    ['hyperliquid', 'hyperliquid-xyz', 'binance-tradifi'].includes(i.venue));
 
   return (
     <aside className="market-watchlist" aria-label={t('Watchlist')}>
@@ -121,7 +115,7 @@ export function MarketWatchlist({
           <span></span>
           <span>{t('Price')}</span>
           <span>{t('24H')}</span>
-          <span>{t('Funding')}</span>
+          <span>{t('Funding / hour')}</span>
           <span>{t('OI')}</span>
           <span></span>
         </div>
@@ -164,12 +158,12 @@ export function MarketWatchlist({
               {hasHyperliquid && (
                 <>
                   <span className="watchlist-cell watchlist-funding tabular">
-                    {i.venue === 'hyperliquid' && row?.quote?.fundingHourlyPct !== undefined
-                      ? fmtFunding(row.quote.fundingHourlyPct)
+                    {row?.quote?.fundingHourlyPct !== undefined
+                      ? fundingText(row.quote.fundingHourlyPct)
                       : '—'}
                   </span>
                   <span className="watchlist-cell watchlist-oi tabular">
-                    {i.venue === 'hyperliquid' && row?.quote?.openInterestUsd
+                    {row?.quote?.openInterestUsd != null
                       ? abbrevUsd(row.quote.openInterestUsd)
                       : '—'}
                   </span>

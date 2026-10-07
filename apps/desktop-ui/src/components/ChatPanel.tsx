@@ -1,4 +1,6 @@
 import { contextLabel, time } from './marketUi';
+import { instrumentIcon } from './instrumentIcons';
+import { BrandIcon } from './BrandIcon';
 import { useI18n } from '../i18n';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Markdown } from './Markdown';
@@ -77,6 +79,7 @@ export function ChatPanel(p: ChatPanelProps) {
   const { t, language, locale } = useI18n();
   const log = useRef<HTMLDivElement>(null);
   const composing = useRef(false);
+  const contextIcon = p.context ? instrumentIcon(p.context.instrument.symbol) : null;
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight });
   }, [p.messages]);
@@ -196,15 +199,15 @@ export function ChatPanel(p: ChatPanelProps) {
         {p.context && (
           <div
             className="composer-context"
-            title={`${p.context.source} · ${time(p.context.fetchedAt, locale)}`}
+            title={`${contextLabel(p.context, language)} · ${time(p.context.fetchedAt, locale)}`}
           >
-            <span>{contextLabel(p.context, language)}</span>
-            <span>
-              {p.context.selectedRange
-                ? t('Selected range')
-                : p.context.visibleRange
-                  ? t('Visible range')
-                  : t('Chart snapshot')}
+            {contextIcon ? (
+              <img src={contextIcon} alt="" className="composer-context-icon" width={18} height={18} />
+            ) : (
+              <BrandIcon symbol={p.context.instrument.symbol} />
+            )}
+            <span className="composer-context-symbol">
+              {p.context.instrument.symbol}
             </span>
           </div>
         )}

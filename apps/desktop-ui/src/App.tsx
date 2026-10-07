@@ -264,7 +264,31 @@ export function App() {
           ? t('Connection offline')
           : t('Connecting…');
 
-  const restore = useCallback(async (id: string) => {
+  const handledMarketActions = useRef(new Set<string>());
+  const receiveMarketAction = useCallback((sessionId: string, action: MarketAction) => {
+    if (action.kind !== 'view' || sessionId !== currentRef.current || handledMarketActions.current.has(action.id)) return;
+    handledMarketActions.current.add(action.id);
+    if (handledMarketActions.current.size > 500)
+      handledMarketActions.current.delete(handledMarketActions.current.values().next().value!);
+    if (
+      viewRef.current === 'chat' &&
+      (action.originViewId === undefined ||
+        action.originViewId === marketContext.current?.viewId ||
+        pendingMarketActions.current.some(pending => pending.action.context.viewId === action.originViewId))
+    ) {
+      marketSessionRef.current = sessionId;
+      setMarketSession(sessionId);
+      localStorage.setItem('seris.marketSession', sessionId);
+      pendingMarketActions.current.push({ action, automatic: true });
+      setMarketsVisited(true);
+      setMarketChatRequest(n => n + 1);
+      setView('markets');
+    } else if (viewRef.current === 'markets' && action.originViewId !== undefined && sessionId === marketSessionRef.current) {
+      if (marketActionHandler.current) marketActionHandler.current(action, true);
+      else pendingMarketActions.current.push({ action, automatic: true });
+    }
+  }, []);
+  const restore = useCallback(async (id: string, liveRunId?: string) => {
     const snapshot = await seris.snapshot(id);
     const watermark = watermarks.current[id];
     if (watermark?.epoch === snapshot.epoch && watermark.seq > snapshot.seq)
@@ -277,7 +301,12 @@ export function App() {
       ...a.filter((p) => p.sessionId !== id),
       ...snapshot.approvals,
     ]);
-  }, []);
+    // Only reconcile this submitted run. Opening saved history never replays chart actions.
+    if (liveRunId) for (const message of snapshot.messages) {
+      if (message.id.startsWith(`${liveRunId}:`) && message.marketAction)
+        receiveMarketAction(id, message.marketAction);
+    }
+  }, [receiveMarketAction]);
   useEffect(() => {
     let active = true;
     const stop = seris.onChatEvent(
@@ -299,34 +328,7 @@ export function App() {
         }));
         const action =
           e.type === 'message' ? e.message?.marketAction : undefined;
-        if (action?.kind === 'view' && e.sessionId === currentRef.current) {
-          if (
-            viewRef.current === 'chat' &&
-            (action.originViewId === undefined ||
-              action.originViewId === marketContext.current?.viewId ||
-              pendingMarketActions.current.some(
-                (pending) =>
-                  pending.action.context.viewId === action.originViewId,
-              ))
-          ) {
-            // Keep this conversation when opening Markets from ordinary Chat.
-            marketSessionRef.current = e.sessionId;
-            setMarketSession(e.sessionId);
-            localStorage.setItem('seris.marketSession', e.sessionId);
-            pendingMarketActions.current.push({ action, automatic: true });
-            setMarketsVisited(true);
-            setMarketChatRequest((n) => n + 1);
-            setView('markets');
-          } else if (
-            viewRef.current === 'markets' &&
-            action.originViewId !== undefined &&
-            e.sessionId === marketSessionRef.current
-          ) {
-            if (marketActionHandler.current)
-              marketActionHandler.current(action, true);
-            else pendingMarketActions.current.push({ action, automatic: true });
-          }
-        }
+        if (action) receiveMarketAction(e.sessionId, action);
         if (e.type === 'run-start')
           setRuns((r) => ({
             ...r,
@@ -579,7 +581,7 @@ export function App() {
             },
       );
       // Snapshot catches a run that finished before the POST response arrived.
-      await restore(sid);
+      await restore(sid, result.runId);
     } catch (e) {
       setNotice(String(e));
     } finally {

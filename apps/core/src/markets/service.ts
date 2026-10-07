@@ -7,6 +7,7 @@ import {
   type AutopilotEngine,
 } from '../autopilot/engine.js';
 import { PublicMarketProvider, type MarketProvider } from './providers.js';
+import { instrumentFromId, normalizeInstrument } from './instruments.js';
 import {
   parseInstrument,
   parseInterval,
@@ -56,6 +57,7 @@ export class MarketService {
   private cache = new Map<string, { expires: number; value: unknown }>();
   private pending = new Map<string, Promise<any>>();
   private snapshots = new Map<string, MarketChart>();
+  private searched = new Map<string, Instrument>();
   readonly provider: MarketProvider;
   readonly engine: AutopilotEngine;
   constructor(
@@ -69,7 +71,7 @@ export class MarketService {
       const data = JSON.parse(readFileSync(file, 'utf8'));
       if (!Array.isArray(data) || data.length > 50)
         throw new Error('Invalid watchlist');
-      this.instruments = data.map(parseInstrument);
+      this.instruments = data.map(normalizeInstrument);
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
       this.instruments = structuredClone(DEFAULT_WATCHLIST);
@@ -79,7 +81,7 @@ export class MarketService {
     return structuredClone(this.instruments);
   }
   add(value: unknown): Instrument[] {
-    const instrument = parseInstrument(value);
+    const instrument = normalizeInstrument(value);
     if (!this.instruments.some((i) => i.id === instrument.id)) {
       if (this.instruments.length >= 50)
         throw new Error('Watchlist supports at most 50 instruments');
@@ -96,17 +98,20 @@ export class MarketService {
     return this.watchlist();
   }
   instrument(id: string): Instrument {
-    const known = this.instruments.find((i) => i.id === id);
+    const known = this.instruments.find((i) => i.id === id) ?? this.searched.get(id);
     if (known) return { ...known };
-    const [venue, providerSymbol] = id.split(':');
-    return parseInstrument({
-      id,
-      venue,
-      providerSymbol,
-      symbol: providerSymbol?.replace(/\.US$/, ''),
-      name: providerSymbol,
-      kind: venue === 'us' ? 'stock' : 'crypto',
-    });
+    return instrumentFromId(id);
+  }
+  async search(query: string): Promise<Instrument[]> {
+    const results = await this.provider.search(query);
+    for (const result of results) {
+      // A malformed enrichment must not hide other search results.
+      let instrument: Instrument;
+      try { instrument = parseInstrument(result); } catch { continue; }
+      this.searched.set(instrument.id, instrument);
+      if (this.searched.size > 200) this.searched.delete(this.searched.keys().next().value!);
+    }
+    return structuredClone(results);
   }
   private cached<T>(
     key: string,
@@ -280,7 +285,7 @@ export class MarketService {
       throw new Error('最多支持 50 个未关闭提醒');
     const units =
       rule.metric === 'price'
-        ? rule.instrument.venue === 'binance'
+        ? ['binance', 'binance-tradifi'].includes(rule.instrument.venue)
           ? 'USDT'
           : 'USD'
         : rule.metric === 'fundingHourlyPct'

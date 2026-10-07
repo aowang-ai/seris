@@ -22,6 +22,43 @@ import { SerisRuntime } from '../dist/runtime/serisRuntime.js';
 import { startGateway } from '../dist/gateway/server.js';
 const btc = DEFAULT_WATCHLIST[0],
   nvda = DEFAULT_WATCHLIST[3];
+test('AI search, candles, chart actions and persistent watchlist accept both new venue IDs through pi', async t => {
+  const { instrumentFromId } = await import('../dist/markets/instruments.js');
+  const instruments = ['binance-tradifi:NVDAUSDT', 'hyperliquid-xyz:xyz:NVDA', 'binance-tradifi:VUSDT']
+    .map(instrumentFromId);
+  instruments[1].maxLeverage = 20;
+  const responses = [];
+  for (const [n, i] of instruments.entries()) responses.push(
+    call('market_search', { query: i.symbol }, `search-${n}`),
+    call('get_market_candles', { instrumentId: i.id, interval: '1h' }, `candles-${n}`),
+    call('market_watchlist', { action: 'add', instrumentId: i.id }, `watch-${n}`),
+    call('market_set_view', { instrumentId: i.id, interval: '1h' }, `view-${n}`),
+  );
+  responses.push(answer([{ type: 'text', text: 'Ready' }]));
+  const { runtime, service, provider, engine, dir } = await marketsFixture(t, responses);
+  provider.search = async query => instruments.filter(i => i.symbol === query);
+  const session = await runtime.createSession();
+  await runtime.prompt(session.id, '搜索 NVDA 和 Visa，读取图表并加入关注');
+  const history = await runtime.sessionHistory(session.id);
+  for (const [n, i] of instruments.entries()) {
+    const candles = JSON.parse(history.find(m => m.toolCallId === `candles-${n}`).text);
+    assert.deepEqual(candles.instrument, i);
+    assert.equal(candles.candles.length, 160);
+    const action = history.find(m => m.toolCallId === `view-${n}`).marketAction;
+    assert.deepEqual(action?.context.instrument, i);
+    assert.deepEqual(service.watchlist().find(w => w.id === i.id), i);
+  }
+  const restored = new MarketService(join(dir, '.data', 'markets', 'watchlist.json'), provider, engine);
+  assert.deepEqual(restored.watchlist(), service.watchlist());
+  for (const [id, kind] of [['hyperliquid-xyz:xyz:AVGO', 'stock'], ['hyperliquid-xyz:xyz:TQQQ', 'etf'], ['binance-tradifi:XAUUSDT', 'commodity']])
+    assert.equal(restored.instrument(id).kind, kind);
+  for (const id of ['hyperliquid-xyz:xyz', 'binance-tradifi:USDT', 'hyperliquid-xyz:xyz:NVDA:bad'])
+    assert.throws(() => restored.instrument(id), /Invalid/);
+  const legacy = [...service.watchlist(), { ...instrumentFromId('hyperliquid-xyz:xyz:AVGO'), kind: 'index' }];
+  await writeFile(join(dir, '.data', 'markets', 'watchlist.json'), JSON.stringify(legacy));
+  const migrated = new MarketService(join(dir, '.data', 'markets', 'watchlist.json'), provider, engine);
+  assert.equal(migrated.watchlist().find(i => i.symbol === 'AVGO').kind, 'stock');
+});
 test('frozen chart is validated, durable and independent of later prices', async (t) => {
   const { service, provider, dir, engine } = await marketsFixture(t);
   const chart = await service.chart(btc, '1h');

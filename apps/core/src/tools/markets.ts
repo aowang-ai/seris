@@ -38,10 +38,10 @@ export function createMarketsTools(
       name: 'market_search',
       category: 'market-data',
       description:
-        'Find crypto perpetuals/spot and US stocks/ETFs. Returns exact instrument IDs.',
+        'Find crypto, stocks, ETFs, commodities, FX and indices, including Binance TradFi and Hyperliquid xyz perpetuals. Returns exact instrument IDs and venues; perpetual prices are not underlying stock exchange prices.',
       parameters: parameters({ query: { type: 'string' } }, ['query']),
       execute: async (_id, args: any) => ({
-        instruments: await resolveService().provider.search(
+        instruments: await resolveService().search(
           String(args.query).slice(0, 80),
         ),
       }),
@@ -211,7 +211,7 @@ export function createMarketsTools(
       name: 'market_alert',
       category: 'autopilot',
       description:
-        'Create a real persisted price/change/funding alert, list alerts, or pause/resume/close one. Clearly specified requests may execute directly. Thresholds are price in USD (USDT for Binance spot) or percentage (funding per hour). Monitoring runs while the app is running; once defaults true.',
+        'Create a real persisted price/change/funding alert, list alerts, or pause/resume/close one. Clearly specified requests may execute directly. Thresholds are price in USD (USDT for Binance venues) or percentage (funding per hour). Monitoring runs while the app is running; once defaults true.',
       parameters: parameters({
         action: {
           type: 'string',

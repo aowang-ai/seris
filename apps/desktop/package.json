@@ -1,6 +1,6 @@
 {
   "name": "@seris/desktop",
-  "version": "0.1.0-beta.5",
+  "version": "0.1.0-beta.6",
   "private": true,
   "type": "module",
   "description": "Seris desktop shell (Tauri). Thin packaging layer: spawns and supervises the @seris/core gateway; the WebView talks straight to the gateway over same-origin HTTP+SSE.",
