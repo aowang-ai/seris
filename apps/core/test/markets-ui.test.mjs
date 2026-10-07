@@ -936,16 +936,7 @@ test('language preference translates all workspaces and Markets dialogs without 
       'en',
     );
     for (const label of ['Automation', 'Portfolio']) {
-      await page.getByRole('button', { name: label, exact: true }).click();
-      await page.getByRole('heading', { name: label, exact: true }).waitFor();
-      assert.match(
-        await page.locator('main').innerText(),
-        /This page is under development\./,
-      );
-      assert.doesNotMatch(
-        await page.locator('main').innerText(),
-        /[\p{Script=Han}]/u,
-      );
+      assert.equal(await page.getByRole('button', { name: label, exact: true }).count(), 0);
     }
     // Strategies is a real workspace now — assert it has the catalog copy.
     await page.getByRole('button', { name: 'Strategies', exact: true }).click();
@@ -1014,13 +1005,7 @@ test('language preference translates all workspaces and Markets dialogs without 
       .getByRole('combobox', { name: 'Language', exact: true })
       .selectOption('zh-CN');
     for (const label of ['自动化', '持仓']) {
-      await page.getByRole('button', { name: label, exact: true }).click();
-      await page.getByRole('heading', { name: label, exact: true }).waitFor();
-      assert.match(await page.locator('main').innerText(), /此页面正在开发中/);
-      assert.doesNotMatch(
-        await page.locator('main').innerText(),
-        /Automation|Portfolio|under development/,
-      );
+      assert.equal(await page.getByRole('button', { name: label, exact: true }).count(), 0);
     }
     // 策略页是真页面了
     await page.getByRole('button', { name: '策略', exact: true }).click();

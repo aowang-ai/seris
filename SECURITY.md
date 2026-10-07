@@ -1,7 +1,8 @@
 # Security
 
-Seris 0.1.x is an Alpha. Security fixes target the latest revision on `main`.
-There is no security support commitment for older snapshots.
+Seris 0.1.x is the initial stable release series for macOS Apple Silicon.
+Security fixes target the latest stable release; update to that release when a
+fix is available. Older releases and pre-release snapshots are not maintained.
 
 Report vulnerabilities privately through the repository's GitHub Security
 Advisories page when private reporting is enabled. If it is unavailable, ask the
@@ -20,8 +21,10 @@ tool actions, but the approved terminal is a full shell under the user's account
 sandbox. Installed skill text and tool results should be treated as untrusted
 content. Run the application with the permissions needed for your work.
 
-Trading and wallet prototypes label mock data and simulated receipts. They must
-not be presented as live balances, executed orders or broadcast transfers.
+The released runtime does not register simulated account, brokerage or wallet
+tools, or placeholder funding and desktop-control tools. Live order execution
+and wallet transfers are outside this release's feature scope. Strategy
+backtests must not be presented as executed trades or live portfolio returns.
 
 Run `pnpm audit --prod` for JavaScript dependencies and review Rust advisories
 when updating native dependencies. A failed audit connection is not a clean

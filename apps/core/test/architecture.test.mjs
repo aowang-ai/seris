@@ -91,26 +91,20 @@ test('bundled skills only advertise tools provided by the runtime', async () => 
   for(const name of skill.toolNames) assert.ok(tools.has(name),`${skill.name} advertises missing tool ${name}`);
  }
 });
-test('Seris wallet tool names retain UI approval before returning simulated transfers', async t => {
+test('release tools reject simulated accounts, trades, wallets and placeholder calls', async t => {
  const {buildRegistry}=await import('../dist/runtime/toolLoader.js');
  const tools=buildRegistry();
- const names=['seris_wallet_fund_perp','seris_wallet_withdraw_to_spot'];
- const responses=names.flatMap(name=>[message([{type:'toolCall',id:name,name,arguments:{walletId:'perp_wallet_main',amountUsd:10}}],'toolUse'),message([{type:'text',text:'Simulated only'}])]);
+ const names=['seris_account','brokerage_accounts_get','brokerage_order_submit','seris_perps_wallets_list','seris_wallet_fund_perp','seris_wallet_withdraw_to_spot','get_funding_rate','computer'];
+ for(const name of names) assert.equal(tools.has(name),false,`${name} must not ship in the release catalog`);
+ for(const name of ['market_search','get_market_candles','market_set_view','strategy_backtest','get_perp_snapshot','get_perp_funding_rate','terminal']) assert.ok(tools.has(name),`${name} remains available`);
+ const responses=names.flatMap(name=>[message([{type:'toolCall',id:name,name,arguments:{}}],'toolUse'),message([{type:'text',text:'Capability unavailable'}])]);
  const {runtime}=await fixture(t,responses,tools);
  const session=await runtime.createSession();
  for(const name of names) {
-  const run=runtime.startPrompt(session.id,'Preview a simulated transfer');
-  await eventually(()=>runtime.approvals.list().length===1);
-  const approval=runtime.approvals.list()[0];
-  assert.equal(approval.toolName,name);
-  assert.equal(runtime.runState(session.id).status,'awaiting-approval');
-  const before=await runtime.sessionHistory(session.id);
-  assert.equal(before.some(m=>m.role==='tool' && m.toolCallId===name && !m.pending),false);
-  runtime.approvals.decide(approval.id,run.id,true);
-  await run.done;
-  assert.equal(runtime.runState(session.id).status,'completed');
+  await runtime.prompt(session.id,'Attempt an unavailable legacy capability');
+  assert.equal(runtime.approvals.list().length,0);
   const result=(await runtime.sessionHistory(session.id)).find(m=>m.role==='tool' && m.toolCallId===name);
-  assert.equal(JSON.parse(result.text).simulatedReceipt.status,'simulated');
+  assert.equal(result?.isError,true,`${name} must return an error rather than simulated data`);
  }
 });
 test('repeated old request does not return or cancel a newer run',async t=>{

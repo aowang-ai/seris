@@ -1,14 +1,14 @@
 # Seris
 
-**An AI trading assistant for your desktop.**
+**An AI market research assistant for your desktop.**
 
 Seris connects conversation with a market workspace. Follow crypto, stocks, ETFs, commodities, FX and indices, inspect candlestick charts, and ask an agent to analyze what you are looking at or set a price alert.
 
-**Status: Beta.** Chat, Markets, model settings and Strategies are connected. Automation and Portfolio pages are prototypes. Trading and wallet tools marked as simulated do not execute real transactions. Alerts run only while the app is running.
+**Status: 0.1.0 stable.** This release supports Chat, Markets, model settings and local strategy backtests on macOS Apple Silicon. Unfinished Automation and Portfolio pages and simulated account, trading and wallet tools are not exposed. Live order execution and wallet transfers are unavailable. Alerts run only while the app is running.
 
-## Install the Beta
+## Install
 
-Download the Apple Silicon DMG from [Releases](https://github.com/aowang-ai/seris/releases). Open it and drag Seris to Applications. The Beta uses a complete ad-hoc signature and is not Apple-notarized. After the first blocked launch, go to **System Settings → Privacy & Security → Open Anyway** and approve Seris. See [Apple's instructions](https://support.apple.com/102445). A keychain prompt may also ask you to authorize access to an existing model credential after an upgrade.
+Download the Apple Silicon DMG from [Releases](https://github.com/aowang-ai/seris/releases). Open it and drag Seris to Applications. The app uses a complete ad-hoc signature and is not Apple-notarized. After the first blocked launch, go to **System Settings → Privacy & Security → Open Anyway** and approve Seris. See [Apple's instructions](https://support.apple.com/102445). Quit the old app before replacing it during an upgrade; conversations, watchlists, model configuration and user strategies remain in the application-data directory. A keychain prompt may ask you to authorize access to an existing model credential after an upgrade.
 
 ## Features
 
@@ -35,7 +35,7 @@ pnpm test        # Offline regression checks; no live model or trading API calls
 pnpm tauri:build
 ```
 
-macOS desktop builds have been validated. Windows and Linux installers still need platform-specific validation. See [Contributing](CONTRIBUTING.md) for additional checks and standalone gateway development.
+The supported desktop platform for 0.1.0 is macOS Apple Silicon. Windows, Linux and Intel Mac installers are not part of this release. See [Contributing](CONTRIBUTING.md) for additional checks and standalone gateway development.
 
 ## Market data
 

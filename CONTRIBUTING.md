@@ -1,6 +1,6 @@
 # Contributing to Seris
 
-Seris is an early Beta. Describe the user problem before proposing a large change. Keep contributions focused and reuse existing libraries where appropriate.
+Seris 0.1.x supports AI chat, real market data and local strategy backtests on macOS Apple Silicon. Describe the user problem before proposing a large change. Keep contributions focused and reuse existing libraries where appropriate. Register only implemented tools; prototypes and simulated account or trading tools must not enter the release catalog.
 
 ## Development
 
@@ -36,6 +36,14 @@ cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
 node apps/desktop/scripts/verify-resources.mjs
 node apps/desktop/scripts/verify-desktop.mjs # macOS interactive startup and recovery
 ```
+
+Before a stable release, also verify the actual previous and candidate bundles:
+
+```bash
+node apps/desktop/scripts/verify-upgrade.mjs /path/to/previous/Seris.app /path/to/candidate/Seris.app
+```
+
+This uses disposable app data and the bundles' own Node runtimes, checks conversation, model metadata, watchlist, strategy and backtest preservation, then removes the old runtime and checks again. It requires access to the Binance public API for real backtest candles. It does not read or modify the user's model credentials. The native startup check covers a fresh data directory; use the compiled client to verify the visible navigation and a real configured model before publishing.
 
 Optional live model checks use `pnpm core:smoke` and `pnpm core:smoke:gateway`. These require model credentials and can incur provider charges. Offline tests do not require those credentials. UI regression tests require Chrome or an executable specified by `SERIS_BROWSER_PATH`.
 

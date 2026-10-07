@@ -78,7 +78,11 @@ jobs:
             echo "- Ad-hoc signed, not notarized: after the first blocked launch, approve Seris in System Settings → Privacy & Security → Open Anyway."
           } > "$NOTES_FILE"
           fi
+          RELEASE_FLAGS=(--latest)
+          if [[ "$TAG" == *-* ]]; then
+            RELEASE_FLAGS=(--prerelease)
+          fi
           gh release create "$TAG" "${{ steps.art.outputs.dmg }}" \
             --title "Seris ${TAG#v}" \
             --notes-file "$NOTES_FILE" \
-            --prerelease
+            "${RELEASE_FLAGS[@]}"

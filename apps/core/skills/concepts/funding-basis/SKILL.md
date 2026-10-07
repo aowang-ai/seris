@@ -4,14 +4,14 @@ description: Read funding rates and spot-perp basis as positioning signals. Usef
 metadata:
   seris:
     priority: 22
-    tool_names: [strategy_get, strategy_backtest, get_funding_rate, get_perp_funding_history]
+    tool_names: [strategy_get, strategy_backtest, get_perp_snapshot, get_perp_funding_history, get_perp_funding_rate]
 ---
 
 # Funding rates & basis
 
 ## Where the signal comes from
 
-Perpetual futures never expire. Exchanges anchor their price to spot via a funding payment every 8h (Hyperliquid, Binance) or every 1h (some venues):
+Perpetual futures never expire. Exchanges anchor their price to spot via funding payments. Use the actual venue and instrument settlement interval; do not assume all sources use an eight-hour cycle:
 
 - **funding > 0** — longs pay shorts. Perp is rich to spot, indicating leveraged long crowding.
 - **funding < 0** — shorts pay longs. Perp is cheap, indicating leveraged short crowding.
@@ -36,13 +36,13 @@ The crowd being "right" for a while does NOT mean the trade is safe — at extre
 When funding crosses a rolling 90th percentile (either side) AND a momentum indicator agrees (e.g. fast MA rolls over), enter the opposite direction for a short hold (4h–24h). High turnover strategy; only works on liquid perps.
 
 **2. Carry trade (cash-and-carry).**
-When funding is high and *stable positive*, a short perp vs. long spot position collects funding without directional risk. Yield is `funding_rate × 3 × 365` annualized. This trade has no delta but has: basis risk (the gap can widen before funding converges), liquidation risk on the short leg, and counterparty risk on the perp venue. NOT suitable for a single-leg backtest in this engine — the engine trades one instrument at a time.
+When funding is high and *stable positive*, a short perp vs. long spot position collects funding. A simple annualized estimate is `funding_rate_per_settlement × settlements_per_day × 365`; identify the interval and units before calculating it. This trade has basis risk (the gap can widen before funding converges), liquidation risk on the short leg, and counterparty risk on the perp venue. NOT suitable for a single-leg backtest in this engine — the engine trades one instrument at a time.
 
 ## What to feed into a Seris backtest
 
 Our current engine replays OHLCV candles and does not see funding data directly. To use funding in a strategy:
 
-- Fetch funding via `get_funding_rate` or `get_perp_funding_history` in a **separate tool call** and pass the relevant percentile into the strategy as a param override
+- Fetch funding via the real venue tools in a **separate tool call** and pass the relevant percentile into the strategy as a param override
 - Write the strategy to use a `fundingExtremeBps` param — the threshold above/below which the trigger activates
 - Do NOT hardcode funding thresholds — what counts as "extreme" varies by asset and regime
 

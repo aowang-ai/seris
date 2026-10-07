@@ -1,4 +1,4 @@
-/** runtime/toolLoader.ts — load every tool domain into the registry. */
+/** Runtime tool catalog: only implemented capabilities ship in the release. */
 
 import { ToolRegistry, type HarnessTool } from '../tools/registry.js';
 import { marketDataTools } from '../tools/market-data.js';
@@ -10,10 +10,7 @@ import { onchainMarketTools } from '../tools/onchain-market.js';
 import { allArtifactTools } from '../tools/artifact/index.js';
 import { autopilotTools } from '../tools/autopilot.js';
 import { proactiveTools } from '../tools/proactive.js';
-import { accountTools } from '../tools/account.js';
-import { brokerageTools } from '../tools/brokerage.js';
 import { memoryTools } from '../tools/memory.js';
-import { perpWalletTools } from '../tools/perpWallet.js';
 import { browserTools } from '../tools/browser.js';
 import { execTools } from '../tools/exec.js';
 import { marketsTools } from '../tools/markets.js';
@@ -31,10 +28,7 @@ export function buildRegistry(): ToolRegistry {
     ...allArtifactTools,
     ...autopilotTools,
     ...proactiveTools,
-    ...accountTools,
-    ...brokerageTools,
     ...memoryTools,
-    ...perpWalletTools,
     ...browserTools,
     ...execTools,
     ...marketsTools,

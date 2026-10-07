@@ -46,15 +46,8 @@ import type {
 } from '../../core/src/markets/types';
 import { SettingsPage } from './components/SettingsPage';
 import { StrategiesPanel } from './components/StrategiesPanel';
-import { AutomationPanel, PortfolioPanel } from './components/Workbench';
 
-type View =
-  | 'chat'
-  | 'markets'
-  | 'strategies'
-  | 'automation'
-  | 'portfolio'
-  | 'settings';
+type View = 'chat' | 'markets' | 'strategies' | 'settings';
 
 const NAV: {
   id: Exclude<View, 'settings'>;
@@ -87,21 +80,6 @@ const NAV: {
         <circle cx="18" cy="6" r="2" />
         <circle cx="6" cy="19" r="2" />
         <path d="M6 7v10m0-3c0-5 12-1 12-6" />
-      </>
-    ),
-  },
-  {
-    id: 'automation',
-    label: 'Automation',
-    icon: <path d="m13 2-9 12h7l-1 8 10-12h-7l1-8Z" />,
-  },
-  {
-    id: 'portfolio',
-    label: 'Portfolio',
-    icon: (
-      <>
-        <rect x="3" y="7" width="18" height="14" rx="2" />
-        <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12a24 24 0 0 0 18 0m-9 0v3" />
       </>
     ),
   },
@@ -962,8 +940,6 @@ export function App() {
           </Suspense>
         )}
         {view === 'strategies' && <StrategiesPanel />}
-        {view === 'automation' && <AutomationPanel />}
-        {view === 'portfolio' && <PortfolioPanel />}
       </main>
 
       {/* circuit-break banner */}

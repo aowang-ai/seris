@@ -230,6 +230,5 @@ export const webSearchTool: HarnessTool = defineTool({
 export const execTools: HarnessTool[] = [
   executeCodeTool,
   terminalTool,
-  computerTool,
   webSearchTool,
 ];

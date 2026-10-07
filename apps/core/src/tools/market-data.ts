@@ -4,11 +4,8 @@
  * Real sources (read-only, no key required):
  *   - CoinGecko public v3: /api/v3/simple/price, /api/v3/search, /api/v3/coins/{id}/market_chart
  *   - Binance spot public: /api/v3/klines
- * Stubs (writes / venues needing keys):
- *   - get_funding_rate: perp funding lives on perp venues (Hyperliquid/Lighter).
- *     Real data for funding history is in perps.ts:get_funding_rate_history via
- *     Binance USDⓈ-M /fapi/v1/fundingRate (no key), so the spot-side
- *     get_funding_rate stays a stub and points callers at the perp tool.
+ * Funding is provided by the real venue tools in hyperliquid.ts and
+ * market-extended.ts; this domain contains no simulated funding snapshot.
  */
 
 import { defineTool, fetchJson } from "./registry.js";
@@ -295,6 +292,5 @@ export const marketDataTools: AgentTool<any, any>[] = [
   getTokenPriceTool,
   searchTokensTool,
   getMarketChartTool,
-  getFundingRateTool,
   getKlinesTool,
 ];

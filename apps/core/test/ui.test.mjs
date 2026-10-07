@@ -98,6 +98,8 @@ test('built UI discovers models, saves multiple choices, scopes blank keys, and 
     );
     await page.goto(gateway.launchUrl);
     await page.getByText('Model setup required', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: 'Automation', exact: true }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Portfolio', exact: true }).count(), 0);
     assert.equal(new URL(page.url()).searchParams.has('ticket'), false);
     await page
       .getByRole('heading', { name: 'Settings', exact: true })
