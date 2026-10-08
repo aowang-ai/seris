@@ -30,7 +30,8 @@ import {
 } from '../strategy/store.js';
 import { toolContext } from '../runtime/toolContext.js';
 import { findStrategyDirectory, userStrategiesRoot, validStrategyName } from '../strategy/files.js';
-import type { Candle, ParamValues, Timeframe } from '../strategy/types.js';
+import { hyperliquidCandles } from '../markets/hyperliquidCandles.js';
+import type { BacktestMarket, BacktestVenue, Candle, ParamValues, Timeframe } from '../strategy/types.js';
 
 const BINANCE_SPOT = 'https://api.binance.com/api/v3';
 const TIMEFRAME_MS: Record<Timeframe, number> = {
@@ -43,6 +44,7 @@ const TIMEFRAME_MS: Record<Timeframe, number> = {
 interface ActiveJob {
   id: string;
   strategyName: string;
+  venue: BacktestVenue;
   symbol: string;
   interval: Timeframe;
   startedAt: number;
@@ -60,20 +62,37 @@ export function setStrategyProgressListener(fn: ProgressListener): void {
   progressListener = fn;
 }
 
-/** Pull a long OHLCV window from Binance by paging through klines. */
+/** Fetch closed candles from the selected venue; never substitute a different market. */
 async function fetchCandles(opts: {
+  venue: BacktestVenue;
+  endTime: number;
   symbol: string;
   interval: Timeframe;
   days: number;
   signal?: AbortSignal;
 }): Promise<Candle[]> {
-  const { symbol, interval, days, signal } = opts;
+  const { venue, symbol, interval, days, signal, endTime } = opts;
+  const startTime = endTime - days * 86_400_000;
   const intervalMs = TIMEFRAME_MS[interval];
   const needBars = Math.ceil((days * 86_400_000) / intervalMs);
   const maxPerReq = 1000;
   const out: Candle[] = [];
-  const endTime = Date.now();
-  let cursor = endTime - days * 86_400_000;
+  if (venue === 'hyperliquid') {
+    const rows = await hyperliquidCandles({ coin: symbol, interval, startTime: Math.floor(startTime), endTime, signal });
+    const candles = [...new Map(rows
+      .filter((r) => r.time >= startTime && r.closeTime < endTime)
+      .map(({ closeTime: _closeTime, ...c }) => [c.time, c] as const)).values()]
+      .sort((a, b) => a.time - b.time);
+    if (!candles.length) throw new Error(`No closed Hyperliquid candles for ${symbol}. Use the exact coin from market_search (BTC, kPEPE, xyz:NVDA), not a Binance pair.`);
+    // Detect a truncated/listing-limited window instead of silently reporting
+    // the shorter result as the requested history. Allow one interval to align.
+    const alignmentMs = interval === '1M' ? 31 * 86_400_000 : intervalMs;
+    if (candles[0].time > startTime + alignmentMs) {
+      throw new Error(`Hyperliquid history for ${symbol} begins at ${new Date(candles[0].time).toISOString()}, after the requested start. Retry with a shorter window; no backtest was saved.`);
+    }
+    return candles;
+  }
+  let cursor = startTime;
   while (out.length < needBars) {
     const limit = Math.min(maxPerReq, needBars - out.length + 100);
     const url =
@@ -121,14 +140,22 @@ async function runBacktestJob(job: ActiveJob, args: {
   slippageBps?: number;
   params?: Partial<ParamValues>;
   strategyDir?: string;
+  signal?: AbortSignal;
 }): Promise<void> {
   try {
-    const signal = toolContext.getStore()?.signal;
+    const signal = args.signal ?? toolContext.getStore()?.signal;
     const loaded = await getStrategyByName(job.strategyName, args.strategyDir);
     if (!loaded || loaded.problems.length) {
       throw new Error(`strategy load failed: ${loaded?.problems.join('; ') || 'not found'}`);
     }
-    const candles = await fetchCandles({ symbol: args.symbol, interval: args.interval, days: args.days, signal });
+    const endTime = Date.now();
+    const market: BacktestMarket = {
+      venue: job.venue, symbol: args.symbol, kind: job.venue === 'hyperliquid' ? 'perpetual' : 'spot',
+      requestedRange: { from: endTime - args.days * 86_400_000, to: endTime },
+      feeBps: args.feeBps ?? 5, slippageBps: args.slippageBps ?? 5,
+      simulation: 'ohlcv', fundingIncluded: false, liquidationIncluded: false,
+    };
+    const candles = await fetchCandles({ venue: job.venue, endTime, symbol: args.symbol, interval: args.interval, days: args.days, signal });
     if (candles.length < 50) throw new Error(`only ${candles.length} candles fetched; widen the window`);
 
     const result = await runBacktest({
@@ -145,7 +172,9 @@ async function runBacktestJob(job: ActiveJob, args: {
       },
     });
 
+    result.market = market;
     const summary = await saveBacktestRun({
+      market,
       strategyName: job.strategyName,
       symbol: args.symbol,
       interval: args.interval,
@@ -271,15 +300,16 @@ export const strategySaveDraftTool: HarnessTool = defineTool({
 export const strategyBacktestTool: HarnessTool = defineTool({
   name: 'strategy_backtest',
   description:
-    'Run a backtest for a strategy against Binance spot OHLCV. Asynchronous — returns a job id immediately; poll strategy_backtest_history or wait for the strategy-backtest-end event. Results persist to the local backtests store.',
+    'Run an OHLCV price backtest on Binance spot or Hyperliquid perpetuals (including HIP-3 coins such as xyz:NVDA). Select venue explicitly for Hyperliquid; never substitute Binance. Funding, leverage and liquidation are not simulated. Hyperliquid provides only the latest 5000 candles and no 6h interval. Asynchronous — returns a job id immediately; poll strategy_backtest_history or wait for the strategy-backtest-end event. Results persist to the local backtests store.',
   category: 'strategies',
   parameters: {
     type: 'object',
     properties: {
       name: { type: 'string', description: 'Strategy directory name' },
-      symbol: { type: 'string', description: 'Binance spot symbol, e.g. BTCUSDT, ETHUSDT' },
+      venue: { type: 'string', enum: ['binance', 'hyperliquid'], description: 'Data venue. Defaults to binance for existing callers. Set hyperliquid for Hyperliquid/xyz perpetuals.' },
+      symbol: { type: 'string', description: 'Binance: BTCUSDT. Hyperliquid: exact case-sensitive coin from market_search, e.g. BTC, ETH, kPEPE, xyz:NVDA.' },
       interval: { type: 'string', enum: Object.keys(TIMEFRAME_MS), description: 'Candle timeframe; defaults to the strategy\'s declared timeframe.' },
-      days: { type: 'number', description: 'How many days of history to fetch. Default 90.' },
+      days: { type: 'number', description: 'How many days of history to fetch. Default 90. Hyperliquid: keep within 5000 recent candles (e.g. 14 days at 1h or 5m); excessive windows fail without truncation.' },
       initialCash: { type: 'number', description: 'Starting cash in quote currency. Default 10,000.' },
       feeBps: { type: 'number', description: 'Taker fee in bps. Default 5.' },
       slippageBps: { type: 'number', description: 'Slippage in bps against the trader. Default 5.' },
@@ -287,9 +317,10 @@ export const strategyBacktestTool: HarnessTool = defineTool({
     },
     required: ['name', 'symbol'],
   },
-  async execute(_id, params) {
+  async execute(_id, params, signal) {
     const args = params as {
       name: string;
+      venue?: BacktestVenue;
       symbol: string;
       interval?: Timeframe;
       days?: number;
@@ -299,19 +330,42 @@ export const strategyBacktestTool: HarnessTool = defineTool({
       params?: Partial<ParamValues>;
     };
     if (!validName(args.name)) throw new Error('Invalid strategy name');
-    if (typeof args.symbol !== 'string' || !/^[A-Z0-9]{2,20}$/i.test(args.symbol)) {
-      throw new Error('Invalid symbol (expected e.g. BTCUSDT)');
+    const venue = args.venue ?? 'binance';
+    if (venue !== 'binance' && venue !== 'hyperliquid') throw new Error('Unsupported backtest venue');
+    const symbolPattern = venue === 'binance' ? /^[A-Z0-9]{2,20}$/i : /^(?:[a-z][a-z0-9-]*:)?[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
+    if (typeof args.symbol !== 'string' || !symbolPattern.test(args.symbol)) {
+      throw new Error('Invalid symbol: use BTCUSDT for Binance, BTC or xyz:NVDA for Hyperliquid');
+    }
+    const symbol = venue === 'binance' ? args.symbol.toUpperCase() : args.symbol;
+    const days = args.days ?? 90;
+    const initialCash = args.initialCash ?? 10_000;
+    if (!Number.isFinite(days) || days <= 0 || !Number.isFinite(initialCash) || initialCash <= 0) {
+      throw new Error('days and initialCash must be finite positive numbers');
+    }
+    for (const cost of [args.feeBps, args.slippageBps]) {
+      if (cost !== undefined && (!Number.isFinite(cost) || cost < 0 || cost >= 10_000)) {
+        throw new Error('feeBps and slippageBps must be between 0 (inclusive) and 10000 (exclusive)');
+      }
     }
     const loadedHead = await getStrategyByName(args.name);
     if (!loadedHead || loadedHead.problems.length) {
       throw new Error(`Strategy "${args.name}" failed to load: ${loadedHead?.problems.join('; ') ?? 'not found'}`);
     }
     const interval = args.interval ?? loadedHead.strategy.timeframe;
-    if (!TIMEFRAME_MS[interval]) throw new Error(`Unsupported interval ${interval}`);
+    if (!Object.hasOwn(TIMEFRAME_MS, interval)) throw new Error(`Unsupported interval ${interval}`);
+    if (venue === 'hyperliquid') {
+      if (interval === '6h') throw new Error('Hyperliquid does not provide 6h candles. Choose 4h or 8h.');
+      // Reserve room for the boundary and forming candle. Months vary in length.
+      const minIntervalMs = interval === '1M' ? 28 * 86_400_000 : TIMEFRAME_MS[interval];
+      if (Math.ceil(days * 86_400_000 / minIntervalMs) + 2 > 5000) {
+        throw new Error(`Hyperliquid only provides the latest 5000 candles. For ${interval}, use at most ${(4998 * minIntervalMs / 86_400_000).toFixed(2)} days or choose a larger interval. No history was truncated.`);
+      }
+    }
     const job: ActiveJob = {
       id: `jb_${randomUUID().slice(0, 8)}`,
       strategyName: args.name,
-      symbol: args.symbol.toUpperCase(),
+      venue,
+      symbol,
       interval,
       startedAt: Date.now(),
       status: 'running',
@@ -320,18 +374,20 @@ export const strategyBacktestTool: HarnessTool = defineTool({
     jobs.set(job.id, job);
     // Fire and forget; the runtime abort signal cancels via fetch/loop checks.
     void runBacktestJob(job, {
-      symbol: args.symbol.toUpperCase(),
+      symbol,
       interval,
-      days: args.days ?? 90,
-      initialCash: args.initialCash ?? 10_000,
+      days,
+      initialCash,
       feeBps: args.feeBps,
       slippageBps: args.slippageBps,
       params: args.params,
+      signal,
     });
     return {
       jobId: job.id,
       status: job.status,
       strategyName: job.strategyName,
+      venue: job.venue,
       symbol: job.symbol,
       interval: job.interval,
       hint: 'Poll strategy_backtest_history after a few seconds, or call strategy_backtest_get with the run id once it appears.',
@@ -342,29 +398,38 @@ export const strategyBacktestTool: HarnessTool = defineTool({
 export const strategyBacktestHistoryTool: HarnessTool = defineTool({
   name: 'strategy_backtest_history',
   description:
-    'List past backtest runs, newest first. Filter by strategy name and/or symbol. Use this to reason about parameter changes from prior runs before kicking off a new one.',
+    'List past backtest runs and in-process job status/errors, newest first. Filter by strategy name and/or symbol. Use this to reason about parameter changes from prior runs before kicking off a new one.',
   category: 'strategies',
   parameters: {
     type: 'object',
     properties: {
       name: { type: 'string', description: 'Strategy name to filter by.' },
       symbol: { type: 'string', description: 'Symbol to filter by.' },
+      venue: { type: 'string', enum: ['binance', 'hyperliquid'], description: 'Filter by data venue.' },
+      jobId: { type: 'string', description: 'Check a job returned by strategy_backtest, including failures.' },
       limit: { type: 'number', description: 'Max runs to return (default 10, max 50).' },
     },
   },
   async execute(_id, params) {
-    const args = params as { name?: string; symbol?: string; limit?: number };
+    const args = params as { name?: string; symbol?: string; venue?: BacktestVenue; jobId?: string; limit?: number };
     const runs = await listBacktestRuns({
       strategyName: args.name,
-      symbol: args.symbol?.toUpperCase(),
+      symbol: args.symbol,
+      venue: args.venue,
       limit: Math.min(args.limit ?? 10, 50),
     });
     return {
       count: runs.length,
+      jobs: [...jobs.values()].reverse().filter((job) =>
+        (!args.jobId || job.id === args.jobId) && (!args.name || job.strategyName === args.name)
+        && (!args.symbol || job.symbol.toLowerCase() === args.symbol.toLowerCase())
+        && (!args.venue || job.venue === args.venue)).slice(0, Math.min(args.limit ?? 10, 50)),
       runs: runs.map((r: BacktestRunSummary) => ({
         id: r.id,
         strategyName: r.strategyName,
         symbol: r.symbol,
+        venue: r.market?.venue ?? 'binance',
+        market: r.market,
         interval: r.interval,
         params: r.params,
         candles: r.candles,
@@ -402,6 +467,10 @@ export const strategyBacktestGetTool: HarnessTool = defineTool({
     return {
       id,
       strategyName: detail.strategyName,
+      symbol: detail.market?.symbol ?? summary?.symbol,
+      venue: detail.market?.venue ?? 'binance',
+      interval: detail.timeframe,
+      market: detail.market,
       params: detail.params,
       candles: detail.candles,
       metricsHash: summary?.metricsHash,

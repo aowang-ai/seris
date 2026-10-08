@@ -23,6 +23,7 @@ import { fetchJson } from '../tools/registry.js';
 import { getKlinesTool } from '../tools/market-data.js';
 import { hlPerpSnapshotTool } from '../tools/hyperliquid.js';
 import { cryptoNewsTool } from '../tools/data-sources.js';
+import { hyperliquidCandles } from './hyperliquidCandles.js';
 import { traditionalKind } from './instruments.js';
 import {
   parseInstrument,
@@ -643,31 +644,15 @@ export class PublicMarketProvider implements MarketProvider {
   async candles(instrument: Instrument, interval: MarketInterval) {
     if (instrument.venue === 'hyperliquid') {
       const end = Date.now();
-      const rows = await json('https://api.hyperliquid.xyz/info', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          type: 'candleSnapshot',
-          req: {
-            coin: instrument.providerSymbol,
-            interval,
-            startTime: end - intervalMs[interval] * 500,
-            endTime: end,
-          },
-        }),
+      const rows = await hyperliquidCandles({
+        coin: instrument.providerSymbol, interval,
+        startTime: end - intervalMs[interval] * 500, endTime: end,
       });
       return {
         source: 'Hyperliquid',
         adjustment: 'none',
         candles: cleanCandles(
-          rows.map((r: any) => ({
-            time: Number(r.t) / 1000,
-            open: Number(r.o),
-            high: Number(r.h),
-            low: Number(r.l),
-            close: Number(r.c),
-            volume: Number(r.v),
-          })),
+          rows.map(({ closeTime: _closeTime, ...r }) => ({ ...r, time: r.time / 1000 })),
         ),
       };
     }
@@ -707,31 +692,15 @@ export class PublicMarketProvider implements MarketProvider {
     if (instrument.venue === 'hyperliquid-xyz') {
       await this.xyzContext(instrument);
       const end = Date.now();
-      const rows = await json('https://api.hyperliquid.xyz/info', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          type: 'candleSnapshot',
-          req: {
-            coin: instrument.providerSymbol,
-            interval,
-            startTime: end - intervalMs[interval] * 500,
-            endTime: end,
-          },
-        }),
+      const rows = await hyperliquidCandles({
+        coin: instrument.providerSymbol, interval,
+        startTime: end - intervalMs[interval] * 500, endTime: end,
       });
       return {
         source: 'Hyperliquid xyz',
         adjustment: 'none',
         candles: cleanCandles(
-          rows.map((r: any) => ({
-            time: Number(r.t) / 1000,
-            open: Number(r.o),
-            high: Number(r.h),
-            low: Number(r.l),
-            close: Number(r.c),
-            volume: Number(r.v),
-          })),
+          rows.map(({ closeTime: _closeTime, ...r }) => ({ ...r, time: r.time / 1000 })),
         ),
       };
     }

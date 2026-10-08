@@ -52,3 +52,11 @@ Do not bundle changes. Run the next backtest with exactly one delta from the run
 ## Reminder about metricsHash and dataRange
 
 Every saved run carries `metricsHash` and `dataRange {from, to}`. When citing a metric in an answer or report, name the run id and hash (e.g. "run rb_xxx/hash 4c1e… produced Sharpe 1.21 over 2025-07-01..2025-10-01"). Without this attribution the figure is unverifiable by the user.
+
+## Data venue and coverage
+
+- `strategy_backtest` accepts `venue: "binance"` (spot, default for old callers) or `venue: "hyperliquid"` (perpetuals). Match the user's requested venue; never substitute Binance candles for a Hyperliquid backtest.
+- Use the exact Hyperliquid coin from `market_search`: `BTC`, `ETH`, `kPEPE`, or a HIP-3 name such as `xyz:NVDA`. Preserve case and the dex prefix. `BTCUSDT` is a Binance pair, not a Hyperliquid coin.
+- Hyperliquid exposes only its latest 5,000 candles. Request a shorter window or a larger interval if rejected; do not silently truncate. It does not provide 6h candles. Example: `strategy_backtest({name: "ma-trail-stop", venue: "hyperliquid", symbol: "BTC", interval: "1h", days: 14})`.
+- Poll `strategy_backtest_history` with the returned `jobId` to see completion or the actual failure reason. Completed runs include `market`, cost assumptions, and the actual candle `dataRange`. Read the run with `strategy_backtest_get` before reporting metrics.
+- These are single-instrument OHLCV price simulations with configurable flat fees/slippage. Funding payments, leverage/margin and liquidation are not simulated. Do not present results as funding arbitrage performance or a complete perpetual account simulation.

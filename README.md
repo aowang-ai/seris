@@ -30,7 +30,7 @@
 | --- | --- |
 | **Understand a market move** | Ask in Chat or alongside a chart. Share the current instrument, timeframe and selected range with the agent. |
 | **Follow your markets** | Search instruments, build a watchlist, switch candlestick intervals and set conditional price alerts. |
-| **Test a strategy idea** | Ask for a TypeScript strategy, review its source before saving, and backtest against historical Binance spot candles. |
+| **Test a strategy idea** | Ask for a TypeScript strategy, review its source before saving, and backtest against historical Binance spot or Hyperliquid perpetual candles. |
 | **Use your preferred model** | Connect a cloud provider, a custom OpenAI/Anthropic-compatible endpoint, or a running Ollama or LM Studio server. |
 
 Conversations, watchlists and saved strategies persist across app upgrades. The interface supports English and Chinese.
@@ -65,7 +65,9 @@ Try this in Chat:
 
 > Write a BTC strategy that enters on a moving-average crossover and uses an ATR trailing stop.
 >
-> Backtest ma-trail-stop on BTCUSDT 1h for the last 30 days.
+> Backtest ma-trail-stop on Hyperliquid BTC 1h for the last 14 days.
+
+Hyperliquid backtests use closed candles, including HIP-3 instruments such as `xyz:NVDA`. Its API provides only the latest 5,000 candles and does not support 6h intervals; Seris rejects unavailable windows instead of silently shortening them. Results record the venue, date range, fees and slippage. These are price-only simulations: funding payments, leverage and liquidation are not included.
 
 ## Get started
 

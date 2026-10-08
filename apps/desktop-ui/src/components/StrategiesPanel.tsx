@@ -212,6 +212,7 @@ export function StrategiesPanel(): JSX.Element {
                           onClick={() => setSelectedRun(r.id)}
                         >
                           <strong>{r.symbol}</strong>
+                          <span className="muted">{t(r.market?.venue === 'hyperliquid' ? 'Hyperliquid perpetual' : 'Binance spot')}</span>
                           <span className="muted">{r.interval}</span>
                           <span className={r.metrics.totalReturn >= 0 ? 'gain' : 'loss'}>
                             {fmtPct(r.metrics.totalReturn)}
@@ -228,13 +229,20 @@ export function StrategiesPanel(): JSX.Element {
                 {activeRun && (
                   <section className="run-detail" aria-label={t('Run {id}', { id: activeRun.id })} aria-busy={!result && !runError}>
                     <header className="run-detail-header">
-                      <h3>{activeRun.symbol} · {activeRun.interval}</h3>
+                      <h3>{activeRun.symbol} · {activeRun.interval} · {t(activeRun.market?.venue === 'hyperliquid' ? 'Hyperliquid perpetual' : 'Binance spot')}</h3>
                       <span className="muted">{t('Run {id}', { id: activeRun.id })} · {fmtTime(activeRun.startedAt)}</span>
                     </header>
                     {runError && <p role="alert" className="error">{runError}</p>}
                     {!result && !runError && <p className="muted">{t('Loading…')}</p>}
                     {result && (
                       <>
+                        {result.market && (
+                          <p className="muted">
+                            {t('Fee {fee} bps · Slippage {slippage} bps', { fee: result.market.feeBps, slippage: result.market.slippageBps })}
+                            {result.market.venue === 'hyperliquid' && <> · {t('Price-only simulation; funding, leverage and liquidation are excluded.')}</>}
+                          </p>
+                        )}
+                        <p className="muted">{t('Data range')}: {fmtTime(activeRun.dataRange.from)} — {fmtTime(activeRun.dataRange.to)} · {activeRun.candles} {t('closed candles')}</p>
                         <div className="run-metrics">
                           <div><strong>{t('Total return')}</strong> {fmtPct(result.metrics.totalReturn)}</div>
                           <div><strong>{t('Sharpe')}</strong> {fmtN(result.metrics.sharpe)}</div>

@@ -16,7 +16,7 @@ import { dirname, join } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { dataPath } from '../runtime/paths.js';
 import type { BacktestResult } from './runner.js';
-import type { BacktestRunSummary } from './types.js';
+import type { BacktestRunSummary, BacktestVenue } from './types.js';
 
 export type { BacktestRunSummary } from './types.js';
 
@@ -42,6 +42,7 @@ export async function saveBacktestRun(
     .update(JSON.stringify({
       s: summary.strategyName, y: summary.symbol, i: summary.interval,
       p: summary.params,
+      market: summary.market,
       m: {
         totalReturn: detail.metrics.totalReturn,
         sharpe: detail.metrics.sharpe,
@@ -69,6 +70,7 @@ export async function saveBacktestRun(
 export async function listBacktestRuns(filter: {
   strategyName?: string;
   symbol?: string;
+  venue?: BacktestVenue;
   limit?: number;
 } = {}): Promise<BacktestRunSummary[]> {
   const file = indexPath();
@@ -81,7 +83,8 @@ export async function listBacktestRuns(filter: {
     try {
       const row = JSON.parse(lines[i]) as BacktestRunSummary;
       if (filter.strategyName && row.strategyName !== filter.strategyName) continue;
-      if (filter.symbol && row.symbol !== filter.symbol) continue;
+      if (filter.symbol && row.symbol.toLowerCase() !== filter.symbol.toLowerCase()) continue;
+      if (filter.venue && (row.market?.venue ?? 'binance') !== filter.venue) continue;
       out.push(row);
     } catch { /* skip malformed */ }
   }
