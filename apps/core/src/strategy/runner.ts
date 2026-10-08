@@ -23,6 +23,7 @@
  */
 
 import type {
+  BacktestMarket,
   Candle,
   Context,
   Fill,
@@ -81,6 +82,7 @@ export interface BacktestMetrics {
 }
 
 export interface BacktestResult {
+  market?: BacktestMarket;
   strategyName: string;
   params: ParamValues;
   timeframe: Timeframe;
@@ -384,7 +386,7 @@ function computeMetrics(equity: EquityPoint[], fills: Fill[], initialCash: numbe
   }
 
   // Trade stats: pair each entry fill with its matching exit fill
-  const roundTrips = roundTripStats(fills, initialCash);
+  const roundTrips = roundTripStats(fills);
   const winRate = roundTrips.count > 0 ? roundTrips.wins / roundTrips.count : 0;
   const profitFactor = roundTrips.grossLoss > 0 ? roundTrips.grossWin / roundTrips.grossLoss : roundTrips.grossWin > 0 ? null : 0;
   const totalFees = fills.reduce((s, f) => s + f.fee, 0);
@@ -408,30 +410,20 @@ function computeMetrics(equity: EquityPoint[], fills: Fill[], initialCash: numbe
   };
 }
 
-function roundTripStats(fills: Fill[], initialCash: number) {
-  // Walk fills, pairing entry -> exit by FIFO.
-  let positionValue = 0; // cost basis of the currently open trade (signed)
+function roundTripStats(fills: Fill[]) {
+  // The engine holds one position and always closes it in full (no scaling).
+  // Sum signed cash flows so short entries and covers count exactly as longs.
+  let entry: Fill | null = null;
   let wins = 0, losses = 0, grossWin = 0, grossLoss = 0, count = 0;
-  for (const f of fills) {
-    if (f.signedDelta > 0) {
-      // Buy (entry long or cover short). Track cost.
-      if (positionValue === 0) positionValue = f.signedDelta * f.price + f.fee;
-      else positionValue += f.signedDelta * f.price + f.fee; // average-in; rare
-    } else {
-      // Sell (exit long or open short).
-      const proceeds = -f.signedDelta * f.price - f.fee;
-      if (positionValue > 0) {
-        const pnl = proceeds - positionValue;
-        count++;
-        if (pnl > 0) { wins++; grossWin += pnl; } else { losses++; grossLoss += -pnl; }
-        positionValue = 0;
-      } else {
-        positionValue += -f.signedDelta * f.price + f.fee; // short cost basis
-      }
-    }
+  for (const fill of fills) {
+    if (!entry) { entry = fill; continue; }
+    const pnl = -entry.signedDelta * entry.price - entry.fee
+      - fill.signedDelta * fill.price - fill.fee;
+    count++;
+    if (pnl > 0) { wins++; grossWin += pnl; }
+    else if (pnl < 0) { losses++; grossLoss -= pnl; }
+    entry = null;
   }
-  // An unclosed leftover trade doesn't count.
-  void initialCash;
   return { wins, losses, count, grossWin, grossLoss };
 }
 

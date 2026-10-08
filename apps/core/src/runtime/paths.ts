@@ -21,3 +21,5 @@ export function installedSkillsRoot(): string { return join(dataRoot(), 'skills'
 export function ensureArtifactsDir(): string {
   return process.env.SERIS_ARTIFACTS_DIR?.trim() || dataPath('artifacts');
 }
+
+export function installedExtensionsRoot(): string { return join(dataRoot(), 'extensions'); }

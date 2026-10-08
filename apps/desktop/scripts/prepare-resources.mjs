@@ -21,7 +21,7 @@ await rm(join(stage,'skills/installed'),{recursive:true,force:true});
 const optimized = await optimizeRuntime(stage);
 console.log(`Optimized core: ${(optimized.originalBytes/2**20).toFixed(1)} → ${(optimized.storedBytes/2**20).toFixed(1)} MiB; ${optimized.prunedFiles} development files removed, ${optimized.strippedFiles} native binaries stripped, ${optimized.linkedFiles} duplicates hard-linked`);
 // Preserve symlinks and hardlinks; tar stores identical payloads only once.
-execFileSync('tar',['-czf',join(resources,'core.tar.gz'),'-C',stage,'.'],{stdio:'inherit'});
+execFileSync('tar',['-czf',join(resources,'core.tar.gz'),'-C',stage,'.'],{stdio:'inherit',env:{...process.env,COPYFILE_DISABLE:'1'}});
 await cp(process.execPath,join(resources,'runtime',process.platform==='win32'?'node.exe':'node'));
 await chmod(join(resources,'runtime',process.platform==='win32'?'node.exe':'node'),0o755);
 if (process.platform === 'darwin') await stripAndSign(join(resources,'runtime/node'));

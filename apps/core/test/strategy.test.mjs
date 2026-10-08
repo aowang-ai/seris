@@ -13,7 +13,7 @@ import { ModelSettings } from '../dist/runtime/modelSettings.js';
 import { MemorySecrets } from '../dist/runtime/credentials.js';
 import { startGateway } from '../dist/gateway/server.js';
 import { chromium } from 'playwright-core';
-import { strategyBacktestTool, setStrategyProgressListener } from '../dist/tools/strategies.js';
+import { strategyBacktestTool, strategyBacktestHistoryTool, strategyBacktestGetTool, setStrategyProgressListener } from '../dist/tools/strategies.js';
 import { readBacktestRun } from '../dist/strategy/store.js';
 
 const bar = (i, price, overrides = {}) => ({
@@ -211,4 +211,92 @@ test('backtest tool excludes the forming Binance candle from persisted results',
   const detail = await readBacktestRun(job.summaryId);
   assert.equal(detail.candles, 60);
   assert.equal(detail.candleSeries.at(-1).time, currentOpen - hour);
+});
+
+
+test('Hyperliquid backtests preserve venue and HIP-3 coin, exclude open bars and expose failures', async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'seris-hl-candles-'));
+  const previousDataDir = process.env.SERIS_DATA_DIR;
+  process.env.SERIS_DATA_DIR = dir;
+  t.after(async () => {
+    setStrategyProgressListener(() => {});
+    if (previousDataDir === undefined) delete process.env.SERIS_DATA_DIR;
+    else process.env.SERIS_DATA_DIR = previousDataDir;
+    await rm(dir, { recursive: true, force: true });
+  });
+  const hour = 3_600_000;
+  const currentOpen = Math.floor(Date.now() / hour) * hour;
+  const rows = Array.from({ length: 61 }, (_, i) => ({
+    t: currentOpen - (60 - i) * hour, T: currentOpen - (59 - i) * hour - 1,
+    s: 'xyz:NVDA', i: '1h', o: '100', h: '101', l: '99', c: '100', v: '1000',
+  }));
+  let mode = 'success';
+  let requests = 0;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    requests++;
+    assert.equal(new URL(url).hostname, 'api.hyperliquid.xyz');
+    const body = JSON.parse(init.body);
+    assert.equal(body.type, 'candleSnapshot');
+    assert.equal(body.req.coin, 'xyz:NVDA');
+    assert.equal(body.req.interval, '1h');
+    assert.ok(body.req.startTime > 1e12, 'request timestamps are milliseconds');
+    if (mode === 'empty') return Response.json([]);
+    if (mode === 'truncated') return Response.json(rows.slice(30));
+    if (mode === 'wrong-market') return Response.json([{ ...rows[0], s: 'BTC' }]);
+    return Response.json([...rows, rows[0]].reverse());
+  });
+  const args = { name: 'ma-trail-stop', venue: 'hyperliquid', symbol: 'xyz:NVDA', interval: '1h', days: 61 / 24 };
+  async function job() {
+    let finish;
+    const completed = new Promise((resolve) => { finish = resolve; });
+    setStrategyProgressListener((j) => { if (j.status !== 'running') finish(j); });
+    const launch = (await strategyBacktestTool.execute('hl', args)).details;
+    const done = await completed;
+    assert.equal(done.id, launch.jobId);
+    return done;
+  }
+  const done = await job();
+  assert.equal(done.status, 'completed', done.error);
+  const detail = await readBacktestRun(done.summaryId);
+  assert.equal(detail.candles, 60);
+  assert.equal(detail.candleSeries.at(-1).time, currentOpen - hour);
+  assert.equal(detail.market.venue, 'hyperliquid');
+  assert.equal(detail.market.symbol, 'xyz:NVDA');
+  assert.equal(detail.market.fundingIncluded, false);
+  const history = (await strategyBacktestHistoryTool.execute('history', { venue: 'hyperliquid', symbol: 'xyz:NVDA' })).details;
+  assert.equal(history.runs.length, 1);
+  assert.equal(history.runs[0].market.venue, 'hyperliquid');
+  const fetched = (await strategyBacktestGetTool.execute('get', { id: done.summaryId })).details;
+  assert.equal(fetched.symbol, 'xyz:NVDA');
+  assert.deepEqual(fetched.market, detail.market);
+  assert.equal((await strategyBacktestHistoryTool.execute('other', { venue: 'binance' })).details.runs.length, 0);
+  const count = requests;
+  await assert.rejects(strategyBacktestTool.execute('limit', { ...args, days: 300 }), /5000/);
+  await assert.rejects(strategyBacktestTool.execute('interval', { ...args, interval: '6h' }), /6h/);
+  assert.equal(requests, count, 'unsupported requests fail before data fetch');
+  for (const failure of ['empty', 'truncated', 'wrong-market']) {
+    mode = failure;
+    const failed = await job();
+    assert.equal(failed.status, 'failed');
+    const status = (await strategyBacktestHistoryTool.execute('status', { jobId: failed.id })).details;
+    assert.equal(status.jobs[0].error, failed.error);
+    assert.equal(status.runs.length, 1, 'failed fetch never saves a partial run or substitutes Binance');
+  }
+});
+
+test('short round trips count wins/losses and both fees, including forced exits', async () => {
+  for (const exitPrice of [80, 120]) {
+    const result = await runBacktest({
+      ...options, feeBps: 10,
+      strategy: strategy((_candles, ctx) => ctx.barIndex === 0
+        ? { kind: 'enter-short', notional: 500, reason: 'short' } : { kind: 'hold' }),
+      candles: [bar(0, 100), bar(1, 100), bar(2, exitPrice)],
+    });
+    const pnl = 500 - 5 * exitPrice - 0.5 - 5 * exitPrice * 0.001;
+    assert.ok(Math.abs(result.finalEquity - (1000 + pnl)) < 1e-8);
+    assert.equal(result.metrics.tradeCount, 1);
+    assert.equal(result.metrics.winningTrades, exitPrice === 80 ? 1 : 0);
+    assert.equal(result.metrics.losingTrades, exitPrice === 120 ? 1 : 0);
+    assert.ok(Math.abs((pnl > 0 ? result.metrics.avgWin : -result.metrics.avgLoss) - pnl) < 1e-8);
+  }
 });

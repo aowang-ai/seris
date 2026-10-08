@@ -134,6 +134,21 @@ export interface Strategy {
   onCandle(candles: Candle[], ctx: Context, params: ParamValues): Signal;
 }
 
+export type BacktestVenue = 'binance' | 'hyperliquid';
+
+/** Provenance and cost assumptions, persisted with both index and detail. */
+export interface BacktestMarket {
+  venue: BacktestVenue;
+  symbol: string;
+  kind: 'spot' | 'perpetual';
+  requestedRange: { from: number; to: number };
+  feeBps: number;
+  slippageBps: number;
+  simulation: 'ohlcv';
+  fundingIncluded: false;
+  liquidationIncluded: false;
+}
+
 /** Persisted result metadata shared by the gateway and browser UI. */
 export interface BacktestRunSummary {
   id: string;
@@ -162,4 +177,6 @@ export interface BacktestRunSummary {
   dataRange: { from: number; to: number };
   /** Fills and equity are in the sibling detail file. */
   detailPath: string;
+  /** Absent on legacy Binance runs. */
+  market?: BacktestMarket;
 }

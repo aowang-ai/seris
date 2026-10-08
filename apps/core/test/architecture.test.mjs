@@ -7,7 +7,7 @@ import { request, createServer } from 'node:http';
 import { EventEmitter } from 'node:events';
 import { createRequire } from 'node:module';
 const require = createRequire(new URL('../package.json', import.meta.url));
-const { AssistantMessageEventStream } = await import('@earendil-works/pi-ai');
+const { AssistantMessageEventStream, getCurrentTools } = await import('@earendil-works/pi-ai');
 const {SerisRuntime}=await import('../dist/runtime/serisRuntime.js');
 const {ToolRegistry,defineTool,fetchJson}=await import('../dist/tools/registry.js');
 const {toolContext}=await import('../dist/runtime/toolContext.js');
@@ -30,6 +30,58 @@ async function fixture(t,responses=[],tools=new ToolRegistry()){
 }
 const toolCall=(name='fixture_read')=>message([{type:'toolCall',id:'call-1',name,arguments:{}}],'toolUse');
 const eventually=async(fn)=>{for(let i=0;i<100;i++){if(fn())return;await new Promise(r=>setTimeout(r,10));}assert.fail('Timed out waiting for condition');};
+
+test('deferred tools activate within a run, retain approval, persist and stay inside chat/allowlist boundaries', async t => {
+ const tools = new ToolRegistry(); let writes = 0;
+ tools.register(defineTool({ name: 'deferred_writer', category: 'workspace', defaultActive: false, approval: 'ask',
+  description: 'Write a local result', parameters: { type: 'object', properties: {} }, execute() { writes++; return { saved: true }; } }));
+ const search = message([{ type: 'toolCall', id: 'discover', name: 'tool_search', arguments: { query: 'deferred_writer' } }], 'toolUse');
+ const { runtime, deps } = await fixture(t, [search, toolCall('deferred_writer'), message([{ type: 'text', text: 'Saved' }])], tools);
+ const declarations = []; const stream = deps.models.streamSimple;
+ deps.models.streamSimple = (model, context, options) => { declarations.push(getCurrentTools(context.messages).map(tool => tool.name)); return stream(model, context, options); };
+ const session = await runtime.createSession(); const other = await runtime.createSession();
+ const run = runtime.startPrompt(session.id, 'Discover and save');
+ await eventually(() => runtime.approvals.list().length === 1 || ['failed', 'completed'].includes(runtime.runState(session.id).status));
+ assert.equal(runtime.approvals.list().length, 1, JSON.stringify({run: runtime.runState(session.id), history: await runtime.sessionHistory(session.id)}));
+ assert.deepEqual(declarations[0], ['tool_search']);
+ assert.ok(declarations[1].includes('deferred_writer'));
+ assert.equal(writes, 0, 'discovery must not bypass approval');
+ runtime.approvals.decide(runtime.approvals.list()[0].id, run.id, true); await run.done;
+ assert.equal(writes, 1); assert.equal(runtime.runState(session.id).status, 'completed');
+ await runtime.dispose();
+ const restored = new SerisRuntime(deps); await restored.init(); t.after(() => restored.dispose());
+ await restored.prompt(session.id, 'Continue');
+ assert.ok(declarations.at(-1).includes('deferred_writer'));
+ await restored.prompt(other.id, 'Independent chat');
+ assert.deepEqual(declarations.at(-1), ['tool_search']);
+ const { ActiveTools } = await import('../dist/runtime/activeTools.js');
+ const restricted = new ActiveTools(tools, ['deferred_writer'], ['tool_search'], async () => assert.fail('must not persist forbidden tools'));
+ const result = await restricted.get('tool_search').execute('restricted', { query: 'deferred_writer' });
+ assert.equal(result.details.total, 0); assert.deepEqual(restricted.list().map(tool => tool.name), ['tool_search']);
+ const empty = new ActiveTools(tools, ['deferred_writer'], [], async () => {});
+ assert.deepEqual(empty.list(), []);
+});
+
+test('extensions are discovered without a core edit and services stop once; skills do not activate tools', async t => {
+ const { dir } = await fixture(t); const root = join(dir, 'extensions');
+ await mkdir(join(root, 'sample'), { recursive: true });
+ await writeFile(join(root, '._sample.js'), Buffer.from([0, 5, 22, 7]));
+ await writeFile(join(root, 'sample', 'index.mjs'), `export default api => {
+   let running = false;
+   api.registerTool({name:'sample_read', category:'misc', description:'Read extension state', approval:'none',
+     parameters:{type:'object',properties:{}}, execute:()=>({running})});
+   api.onStart(()=>{running=true}); api.onStop(()=>{running=false});
+ }`);
+ await writeFile(join(root, 'sample', 'SKILL.md'), '---\nname: sample\ndescription: Sample instructions\n---\nCall sample_read.');
+ const { loadExtensions } = await import('../dist/extensions/loader.js');
+ const { SkillRegistry } = await import('../dist/skills/registry.js');
+ const tools = new ToolRegistry(); const extensions = await loadExtensions(tools, [root]);
+ const skills = await SkillRegistry.load(root); assert.match((await skills.dispatch('sample')).body, /sample_read/);
+ assert.equal(tools.get('sample_read').defaultActive, false);
+ await extensions.start(); assert.equal((await tools.get('sample_read').execute('read', {})).details.running, true);
+ await extensions.stop(); await extensions.stop();
+ assert.equal((await tools.get('sample_read').execute('read', {})).details.running, false);
+});
 
 test('full transcript, stable IDs, request idempotency and reload',async t=>{
  let executions=0;const tools=new ToolRegistry().register(defineTool({name:'fixture_read',category:'market-data',description:'fixture',parameters:{type:'object',properties:{}},execute(){executions++;return {observation:'value'};}}));
@@ -72,7 +124,7 @@ test('provider errors and context failures have failed terminal state',async t=>
  deps.model={...model,contextWindow:100};await runtime.prompt(session.id,'Too large');assert.match(runtime.runState(session.id).error,/context budget/);
 });
 test('approval cannot execute before UI decision, binds run and cancels',async t=>{
- let executions=0;const tools=new ToolRegistry().register(defineTool({name:'terminal',category:'workspace',description:'fixture',parameters:{type:'object',properties:{}},execute(){executions++;return {ok:true};}}));
+ let executions=0;const tools=new ToolRegistry().register(defineTool({name:'terminal', approval: 'ask',category:'workspace',description:'fixture',parameters:{type:'object',properties:{}},execute(){executions++;return {ok:true};}}));
  const {runtime}=await fixture(t,[toolCall('terminal'),message([{type:'text',text:'Done'}]),toolCall('terminal')],tools);const session=await runtime.createSession();
  const run=runtime.startPrompt(session.id,'Execute',{requestId:'approve-001'});await eventually(()=>runtime.approvals.list().length===1);const pending=runtime.approvals.list()[0];assert.equal(executions,0);
  assert.throws(()=>runtime.approvals.decide(pending.id,'wrong',true),/another run/);
@@ -84,7 +136,7 @@ test('bundled skills only advertise tools provided by the runtime', async () => 
  const {buildRegistry}=await import('../dist/runtime/toolLoader.js');
  const {SkillRegistry}=await import('../dist/skills/registry.js');
  const {fileURLToPath}=await import('node:url');
- const tools=buildRegistry();
+ const tools=await buildRegistry();
  const skills=await SkillRegistry.load(fileURLToPath(new URL('../skills/',import.meta.url)));
  assert.ok(skills.size>0);
  for(const skill of skills.catalog()) {
@@ -93,7 +145,7 @@ test('bundled skills only advertise tools provided by the runtime', async () => 
 });
 test('release tools reject simulated accounts, trades, wallets and placeholder calls', async t => {
  const {buildRegistry}=await import('../dist/runtime/toolLoader.js');
- const tools=buildRegistry();
+ const tools=await buildRegistry();
  const names=['seris_account','brokerage_accounts_get','brokerage_order_submit','seris_perps_wallets_list','seris_wallet_fund_perp','seris_wallet_withdraw_to_spot','get_funding_rate','computer'];
  for(const name of names) assert.equal(tools.has(name),false,`${name} must not ship in the release catalog`);
  for(const name of ['market_search','get_market_candles','market_set_view','strategy_backtest','get_perp_snapshot','get_perp_funding_rate','terminal']) assert.ok(tools.has(name),`${name} remains available`);
@@ -108,7 +160,7 @@ test('release tools reject simulated accounts, trades, wallets and placeholder c
  }
 });
 test('repeated old request does not return or cancel a newer run',async t=>{
- const tools=new ToolRegistry().register(defineTool({name:'terminal',category:'workspace',description:'fixture',parameters:{type:'object',properties:{}},execute:()=>({ok:true})}));
+ const tools=new ToolRegistry().register(defineTool({name:'terminal', approval: 'ask',category:'workspace',description:'fixture',parameters:{type:'object',properties:{}},execute:()=>({ok:true})}));
  const {runtime}=await fixture(t,[message([{type:'text',text:'first'}]),toolCall('terminal')],tools);const s=await runtime.createSession();const now=Date.now();
  const accept=(text,requestId)=>{const clock=Date.now;Date.now=()=>now;try{return runtime.startPrompt(s.id,text,{requestId});}finally{Date.now=clock;}};
  await accept('First','old-id-001').done;
@@ -182,7 +234,7 @@ test('UI alone decides proactive approvals and stale plan approvals fail closed'
  const newApproval=await engine.act(goal.id);engine.pause(goal.id);await assert.rejects(engine.approve(newApproval.approval.id),/active plan/);
 });
 test('pending tools survive snapshot while awaiting approval',async t=>{
- const tools=new ToolRegistry().register(defineTool({name:'terminal',category:'workspace',description:'fixture',parameters:{type:'object',properties:{}},execute:()=>({ok:true})}));const {runtime}=await fixture(t,[toolCall('terminal')],tools);const s=await runtime.createSession();const run=runtime.startPrompt(s.id,'Wait',{requestId:'snapshot-001'});await eventually(()=>runtime.approvals.list().length===1);const snapshot=await runtime.snapshot(s.id,()=>({epoch:'fixture',seq:1}));assert.equal(snapshot.messages.find(m=>m.role==='tool').pending,true);assert.equal(snapshot.messages.find(m=>m.role==='tool').toolCallId,'call-1');run.abort();await run.done;
+ const tools=new ToolRegistry().register(defineTool({name:'terminal', approval: 'ask',category:'workspace',description:'fixture',parameters:{type:'object',properties:{}},execute:()=>({ok:true})}));const {runtime}=await fixture(t,[toolCall('terminal')],tools);const s=await runtime.createSession();const run=runtime.startPrompt(s.id,'Wait',{requestId:'snapshot-001'});await eventually(()=>runtime.approvals.list().length===1);const snapshot=await runtime.snapshot(s.id,()=>({epoch:'fixture',seq:1}));assert.equal(snapshot.messages.find(m=>m.role==='tool').pending,true);assert.equal(snapshot.messages.find(m=>m.role==='tool').toolCallId,'call-1');run.abort();await run.done;
 });
 test('load_skill reads a bundled skill body',async t=>{
  const {dir}=await fixture(t);

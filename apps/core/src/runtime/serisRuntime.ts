@@ -7,13 +7,11 @@ import { dirname, join } from 'node:path';
 import type { ToolRegistry } from '../tools/registry.js';
 import type { SkillRegistry } from '../skills/registry.js';
 import { compactIfNeeded } from '../compaction/compactor.js';
-import { getFewShotStore, FewShotStore } from '../fewshot/harvest.js';
-import { Approvals, requiresApproval } from './approvals.js';
+import { AgentMemory } from '../memory/agentMemory.js';
+import { ActiveTools } from './activeTools.js';
+import { Approvals } from './approvals.js';
 import { toolContext } from './toolContext.js';
-import { closeBrowser } from '../tools/browser.js';
 import { workspaceRoot } from './paths.js';
-import { getAutopilotEngine } from '../autopilot/engine.js';
-import { defaultMemoryStore } from '../memory/store.js';
 import { generateSessionTitle } from './sessionTitle.js';
 import { SessionStore } from './sessionStore.js';
 import { isApprovalMode, isUntitledSessionName, sessionTitleFallback, type ApprovalMode } from '../protocol.js';
@@ -28,6 +26,8 @@ export interface PromptOptions { toolAllowList?: string[]; requestId?: string; m
 interface RunHandle { id: string; abort(): void; done: Promise<void> }
 export interface SerisRuntimeDeps {
   models?: MutableModels; model?: Model<Api>; modelSettings?: ModelSettings; tools: ToolRegistry; skills: SkillRegistry;
+  memory?: AgentMemory; shutdown?(): Promise<void>;
+  goalApprovals?: { list(): unknown[]; decide(id: string, allowed: boolean): void | Promise<void> };
   buildSystemPrompt(): Promise<string>; sessionsRoot: string; cwd?: string;
 }
 
@@ -40,10 +40,14 @@ export class SerisRuntime {
   private titleTasks = new Map<string, { abort: AbortController; done: Promise<void> }>();
   private live = new Map<string, HistoryEntry>();
   readonly approvals = new Approvals();
+  get goalApprovals() { return this.deps.goalApprovals; }
   private store!: SessionStore;
+  private memory: AgentMemory;
+  private disposed = false;
   private currentId: string | null = null;
   private readonly runsPath: string;
   constructor(private readonly deps: SerisRuntimeDeps) {
+    this.memory = deps.memory ?? new AgentMemory();
     this.runsPath = join(dirname(deps.sessionsRoot), '.data', 'runs.json');
   }
   async init(): Promise<void> {
@@ -151,6 +155,7 @@ export class SerisRuntime {
   }
   async prompt(id: string, text: string, opts: PromptOptions = {}): Promise<void> { await this.startPrompt(id, text, opts).done; }
   startPrompt(sessionId: string, text: string, opts: PromptOptions = {}): RunHandle {
+    if (this.disposed) throw new Error('Runtime is closed');
     if (!this.configured) throw new Error('Configure an API key before starting a run');
     opts={...opts,marketContext:opts.marketContext?structuredClone(opts.marketContext):undefined};
     const id = opts.requestId ?? randomUUID();
@@ -203,18 +208,25 @@ export class SerisRuntime {
         return history;
       });
       abort.signal.throwIfAborted();
-      const fewShot = getFewShotStore();
-      const learned = fewShot.renderForPrompt(fewShot.retrieve(text, 3));
+      const learned = this.memory.prepareContext(text);
       const {model,models}=kernel;
       const marketSkill=opts.marketContext&&typeof this.deps.skills.dispatch==='function'?await this.deps.skills.dispatch('markets'):null;
       const system = `${await this.deps.buildSystemPrompt()}${marketSkill?`\n\n${marketSkill.body}`:''}${learned ? `\n\n${learned}` : ''}`;
-      const toolSet = (opts.toolAllowList ? this.deps.tools.toolSetByNames(opts.toolAllowList) : this.deps.tools.list()).map(t => ({
-        ...t, execute: (callId: string, args: unknown, signal?: AbortSignal, onUpdate?: any) => toolContext.run(executionContext, () => t.execute(callId, args, signal, onUpdate)),
-      }));
+      const selection = new ActiveTools(this.deps.tools, await this.store.activeTools(sessionId), opts.toolAllowList,
+        names => this.enqueue(sessionId, () => { abort.signal.throwIfAborted(); return this.store.activateTools(sessionId, names); }));
       const executionContext={sessionId,runId,workspace:this.deps.cwd??workspaceRoot(),signal:abort.signal,marketContext:opts.marketContext?structuredClone(opts.marketContext):undefined};
+      const selectedTools = () => selection.list().map(t => ({
+        ...t, execute: (...args: Parameters<typeof t.execute>) => toolContext.run(executionContext, () => t.execute(...args)),
+      }));
+      let toolSet = selectedTools();
       const context: AgentContext = { messages: [{ role: 'system', content: system, timestamp: 0 } as AgentMessage, ...history], tools: toolSet };
       const config: AgentLoopConfig = {
         model, reasoning: 'minimal', convertToLlm: msgs => msgs as Message[],
+        prepareNextTurn: ({ context }) => {
+          abort.signal.throwIfAborted();
+          toolSet = selectedTools();
+          return { context: { ...context, tools: toolSet } };
+        },
         transformContext: async msgs => {
           const session = await this.enqueue(sessionId, () => this.store.metadata(sessionId));
           const permission = session.approvalMode === 'allow-all'
@@ -233,7 +245,7 @@ export class SerisRuntime {
         },
         beforeToolCall: async ({ toolCall, args }) => {
           abort.signal.throwIfAborted();
-          if (!requiresApproval(toolCall.name)) return;
+          if (selection.get(toolCall.name)?.approval !== 'ask') return;
           let decision: Promise<boolean> | undefined;
           await this.enqueue(sessionId, async () => {
             abort.signal.throwIfAborted();
@@ -287,8 +299,7 @@ export class SerisRuntime {
       }, abort.signal, models.streamSimple.bind(models));
       if (abort.signal.aborted) status = 'cancelled';
       if (status === 'completed') {
-        const verdict = FewShotStore.isWorthLearning(called, answer);
-        if (verdict.worth) fewShot.harvest(text, called, answer, verdict.reason);
+        this.memory.recordOutcome(text, called, answer);
       }
     } catch (e) {
       status = abort.signal.aborted ? 'cancelled' : 'failed';
@@ -320,14 +331,15 @@ export class SerisRuntime {
   }
   abort(id: string): void { this.runners.get(id)?.abort(); }
   async dispose(): Promise<void> {
+    if (this.disposed) return;
+    this.disposed = true;
     for (const h of this.runners.values()) h.abort();
     await Promise.allSettled([...this.runners.values()].map(h => h.done));
     for (const task of this.titleTasks.values()) task.abort.abort();
     await Promise.allSettled([...this.titleTasks.values()].map(task => task.done));
-    await this.store.close();
-    getAutopilotEngine().stop();
-    await defaultMemoryStore.flush();
-    await closeBrowser();
+    const results = await Promise.allSettled([this.store?.close(), this.memory.close(), this.deps.shutdown?.()]);
+    const errors = results.flatMap(result => result.status === 'rejected' ? [result.reason] : []);
+    if (errors.length) throw new AggregateError(errors, 'Unable to close runtime');
   }
   private async entries(id: string) {
     return this.store.entries(id);

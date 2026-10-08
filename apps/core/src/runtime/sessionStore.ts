@@ -10,6 +10,12 @@ const ChatMeta = defineDoc({
   initial: () => ({ name: 'New chat', createdAt: 0, modifiedAt: 0, approvalMode: 'ask' as ApprovalMode }),
 });
 
+// Separate from UI metadata: existing conversations lazily get an empty selection.
+const ToolSelection = defineDoc({
+  kind: 'seris.tools', version: 1, scope: 'conversation', history: 'latest', fork: 'current',
+  initial: () => ({ active: [] as string[] }),
+});
+
 function metadata(id: string, meta: Omit<SessionMeta, 'id'>): SessionMeta {
   // Existing v1 chat documents predate approval modes and keep asking by default.
   return { id, ...meta, approvalMode: meta.approvalMode ?? 'ask' };
@@ -69,6 +75,21 @@ export class SessionStore {
       meta.approvalMode = approvalMode;
       meta.modifiedAt = Date.now();
       return metadata(id, meta);
+    }, BACKGROUND_CONTEXT);
+  }
+
+  async activeTools(id: string): Promise<string[]> {
+    return this.session.commit(async tx => {
+      await this.meta(tx, id);
+      return [...(await tx.doc(ToolSelection, this.id(id))).active];
+    }, BACKGROUND_CONTEXT);
+  }
+
+  async activateTools(id: string, names: string[]): Promise<void> {
+    await this.session.commit(async tx => {
+      await this.meta(tx, id);
+      const state = await tx.doc(ToolSelection, this.id(id));
+      state.active = [...new Set([...state.active, ...names])];
     }, BACKGROUND_CONTEXT);
   }
 

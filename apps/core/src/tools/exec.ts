@@ -8,7 +8,7 @@ import { toolContext, toolSignal } from '../runtime/toolContext.js';
 
 const workspaceRoot = () => path.resolve(toolContext.getStore()?.workspace ?? defaultWorkspace());
 export const executeCodeTool: HarnessTool = defineTool({
-  name: 'execute_code', category: 'workspace',
+  name: 'execute_code', approval: 'ask', category: 'workspace',
   description: 'Run local JavaScript after user approval. Filesystem access is restricted to the task workspace and temporary code directory. Returns stdout, stderr and exit code.',
   parameters: {type:'object',properties:{code:{type:'string'},language:{type:'string',enum:['javascript','js','node']},timeoutMs:{type:'number'}},required:['code']},
   async execute(_id: string, params: unknown, signal?: AbortSignal) {
@@ -30,7 +30,7 @@ export const executeCodeTool: HarnessTool = defineTool({
   },
 });
 export const terminalTool: HarnessTool = defineTool({
-  name:'terminal',category:'workspace',description:'Run a local shell command after user approval. This is a full shell, with credentials removed from its environment.',
+  name:'terminal', approval: 'ask',category:'workspace',description:'Run a local shell command after user approval. This is a full shell, with credentials removed from its environment.',
   parameters:{type:'object',properties:{command:{type:'string'},cwd:{type:'string'},timeoutMs:{type:'number'}},required:['command']},
   async execute(_id:string,params:unknown,signal?:AbortSignal) {
     signal?.throwIfAborted();

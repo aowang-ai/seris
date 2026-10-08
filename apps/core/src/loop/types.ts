@@ -62,4 +62,8 @@ import type { AgentTool as PiAgentTool } from '@earendil-works/pi-agent-core';
  */
 export interface HarnessTool extends PiAgentTool<any> {
   category: ToolCategory;
+  /** Visibility only; never grants execution permission. */
+  defaultActive?: boolean;
+  approval?: 'ask' | 'none';
+  searchTerms?: string;
 }

@@ -19,7 +19,7 @@ Start with [README.md](README.md) for the product, [CONTRIBUTING.md](CONTRIBUTIN
 | `apps/core/src/protocol.ts` | Shared UI/core contracts, protocol version and runtime validators |
 | `apps/core/src/markets/` | Instruments, market providers and market state |
 | `apps/core/src/strategy/` | Strategy SDK, loading, durable storage and backtest execution |
-| `apps/core/src/tools/` | Tool definitions; registration is controlled by `runtime/toolLoader.ts` |
+| `apps/core/src/tools/`, `extensions/` | pi tools and automatically discovered extension modules; see `EXTENSIONS.md` |
 | `apps/core/skills/` | Bundled skill instructions and strategy examples |
 | `apps/desktop-ui/src/` | React UI; `App.tsx` coordinates state and `seris.ts` owns gateway access |
 | `apps/desktop-ui/src/components/` | Chat, Markets, Strategies and model/settings components |
@@ -54,6 +54,8 @@ These are available commands, not a checklist to run for every change. See the v
 - Use strict TypeScript and ESM. Follow the surrounding file's style; ordinary TypeScript uses two-space indentation, single quotes and semicolons. Core relative imports use `.js` extensions for NodeNext output. Avoid unrelated formatting changes.
 - Use explicit types at module and API boundaries, runtime validation for external input, and `import type` for type-only dependencies. Do not pull Node runtime modules into the browser bundle.
 - Change shared API contracts in `protocol.ts`, update their validators and consumers together, and consider a protocol version change when compatibility changes. Preserve SSE ordering, reconnect behavior and snapshot restoration.
+- Keep memory retrieval, layered memory and experience harvesting enabled; changes to learning policy require their own scope.
+- Add capabilities through the extension module entry described in [EXTENSIONS.md](EXTENSIONS.md). Skills provide instructions, not tool activation. Tool discovery is scoped to the chat and must respect host allowlists and per-tool approvals.
 - Reuse the existing pi runtime, tool registry and skill-loading path. Tool execution must propagate cancellation. Preserve SDK tool declarations when transforming model context.
 - Do not introduce per-task limits on model turns or tool-call counts. Keep Stop/cancellation functional; provider context limits and network timeouts serve different purposes.
 - Permission choices belong to the authenticated UI and persist per chat. New chats default to asking for gated actions; model-generated parameters must not elevate permissions. Read `SECURITY.md` before changing this boundary.

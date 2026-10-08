@@ -11,7 +11,7 @@ import { isChatEvent, isSnapshot } from '../dist/protocol.js';
 const done = () => answer([{ type: 'text', text: 'Finished' }]);
 const write = (n) => call('strategy_save_draft', { variant: n }, `save-${n}`);
 function registerWriter(tools, execute) {
-  tools.register(defineTool({ name: 'strategy_save_draft', category: 'workspace', description: 'Permission regression writer',
+  tools.register(defineTool({ name: 'strategy_save_draft', approval: 'ask', category: 'workspace', description: 'Permission regression writer',
     parameters: { type: 'object', properties: { variant: { type: 'number' } }, required: ['variant'] }, execute }));
 }
 

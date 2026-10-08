@@ -10,8 +10,6 @@ import { EventHub } from './events.js';
 import { isApprovalMode, parsePrompt, PROTOCOL_VERSION } from '../protocol.js';
 import { providerCatalog } from '../runtime/streamFactory.js';
 import { detectLocalModels } from '../runtime/modelDiscovery.js';
-import { getProactiveEngine } from '../proactive/engine.js';
-import { getAutopilotEngine } from '../autopilot/engine.js';
 import { marketRoute } from './markets.js';
 import { getMarketService, type MarketService } from '../markets/service.js';
 
@@ -73,7 +71,7 @@ export async function startGateway(opts:GatewayOptions):Promise<GatewayHandle>{
       const action=path.endsWith('/connections')?'save':path.endsWith('/select')?'select':path.endsWith('/remove')?'remove':'test';
       sendJson(res,200,await runtime.updateModelSettings(action,action==='save'||action==='select'?body:body.id));return;
     }
-    if(path==='/api/approvals'&&method==='GET'){sendJson(res,200,{tools:runtime.approvals.list(),goals:getProactiveEngine().listApprovals()});return;}
+    if(path==='/api/approvals'&&method==='GET'){sendJson(res,200,{tools:runtime.approvals.list(),goals:runtime.goalApprovals?.list()??[]});return;}
     if(path==='/api/approvals'&&method==='POST'){
       const body=await readBody(req);
       if(typeof body.id!=='string'||!['approve','reject'].includes(body.decision)||!['tool','goal'].includes(body.kind))throw new Error('Invalid approval decision');
@@ -81,8 +79,8 @@ export async function startGateway(opts:GatewayOptions):Promise<GatewayHandle>{
         if(typeof body.runId!=='string')throw new Error('runId is required');
         runtime.approvals.decide(body.id,body.runId,body.decision==='approve');
       }else{
-        const engine=getProactiveEngine();
-        if(body.decision==='approve')await engine.approve(body.id,{decidedBy:'user'});else engine.reject(body.id,{decidedBy:'user'});
+        if(!runtime.goalApprovals)throw new Error('Goal approvals are unavailable');
+        await runtime.goalApprovals.decide(body.id,body.decision==='approve');
       }
       sendJson(res,200,{ok:true});return;
     }
@@ -141,7 +139,7 @@ if(direct){
   let closing=false;
   const shutdown=async()=>{
     if(closing)return;closing=true;const deadline=setTimeout(()=>process.exit(1),5000);deadline.unref();
-    getAutopilotEngine().stop();await runtime.dispose();await gw.close();process.exit(0);
+    await runtime.dispose();await gw.close();process.exit(0);
   };
   process.on('SIGTERM',()=>void shutdown());process.on('SIGINT',()=>void shutdown());
   // Parent closes stdin on exit. This works on platforms without POSIX signals too.

@@ -38,4 +38,9 @@ Run `pnpm audit --prod` for JavaScript dependencies and review Rust advisories
 when updating native dependencies. A failed audit connection is not a clean
 audit result. See [contributor checks](CONTRIBUTING.md#checks) for build and dependency checks.
 
+Installed extensions under the application data directory are trusted executable
+ESM modules loaded at startup. They run under the user's account; skill text alone
+cannot register executable tools. Tool discovery does not grant action approval
+or bypass a host tool allowlist. See [extension authoring](EXTENSIONS.md).
+
 Website: https://seris.im
