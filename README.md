@@ -18,7 +18,7 @@
   <a href="#development">Build from source</a>
 </p>
 
-<p align="center"><strong>v0.1.0 stable</strong> · macOS Apple Silicon · Apache-2.0</p>
+<p align="center"><strong>v0.1.1 stable</strong> · macOS Apple Silicon · Apache-2.0</p>
 
 ![Seris showing a live BTC candlestick chart with AI analysis alongside it](.github/assets/workspace.png)
 
@@ -34,6 +34,8 @@
 | **Use your preferred model** | Connect a cloud provider, a custom OpenAI/Anthropic-compatible endpoint, or a running Ollama or LM Studio server. |
 
 Conversations, watchlists and saved strategies persist across app upgrades. The interface supports English and Chinese.
+
+Choose **Ask every time** or **Allow all actions** below the chat input. The choice applies to that conversation and persists across restarts; new chats start with Ask every time. Tasks can continue through as many model and tool calls as needed, and **Stop** remains available.
 
 ## Explore the markets
 
@@ -83,7 +85,7 @@ For upgrades, quit the old app before replacing it. Your local data is retained;
 
 **Keep your workspace.** Conversations, watchlists, strategies and backtest results are stored locally. Approved browser and terminal tools can use your local environment; see [Security](SECURITY.md) for the permission model.
 
-**Release scope.** v0.1.0 supports Chat, Markets, model settings and local strategy backtests on macOS Apple Silicon. Alerts run while the app is running. Live order execution, wallet transfers and connected portfolio balances are unavailable. Windows, Linux and Intel Mac installers are not included in this release.
+**Release scope.** v0.1.1 supports Chat, Markets, model settings and local strategy backtests on macOS Apple Silicon. Alerts run while the app is running. Live order execution, wallet transfers and connected portfolio balances are unavailable. Windows, Linux and Intel Mac installers are not included in this release.
 
 ## Development
 
@@ -96,7 +98,7 @@ pnpm tauri:dev
 
 ```bash
 pnpm typecheck
-pnpm test        # Offline regression checks
+pnpm test        # Existing regression checks, when needed
 pnpm tauri:build
 ```
 

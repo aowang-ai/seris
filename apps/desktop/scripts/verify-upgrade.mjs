@@ -44,6 +44,11 @@ async function gateway(bundle) {
       assert.equal(response.status, 200, path);
       return response.json();
     },
+    async post(path, body) {
+      const response = await fetch(launch.origin + path, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      assert.equal(response.status, 200, path);
+      return response.json();
+    },
     async close() {
       child.kill('SIGTERM');
       if (child.exitCode === null && child.signalCode === null) await new Promise(ok => child.once('exit', ok));
@@ -54,8 +59,10 @@ let active;
 try {
   const old = await unpack(oldApp, 'old-core');
   const current = await unpack(newApp, 'new-core');
-  assert.match(JSON.parse(await readFile(join(old.core, 'package.json'))).version, /-beta\./);
-  assert.equal(JSON.parse(await readFile(join(current.core, 'package.json'))).version, '0.1.0');
+  const oldVersion = JSON.parse(await readFile(join(old.core, 'package.json'))).version;
+  const newVersion = JSON.parse(await readFile(join(current.core, 'package.json'))).version;
+  assert.match(newVersion, /^\d+\.\d+\.\d+$/);
+  assert.notEqual(oldVersion, newVersion, 'Use different baseline and candidate versions');
   await mkdir(join(data, '.data'), { recursive: true });
   // Keyless metadata exercises migration without touching the user's credentials.
   const models = { connections: [{ id: 'upgrade-verification', name: 'Upgrade verification', provider: 'openai-compatible', baseUrl: 'http://127.0.0.1:9/v1', modelId: 'verification-only', requiresKey: false }], selected: { connectionId: 'upgrade-verification', modelId: 'verification-only' } };
@@ -74,14 +81,16 @@ try {
     import { saveBacktestRun } from './dist/strategy/store.js';
     const store = await SessionStore.open(join(process.env.SERIS_DATA_DIR, 'sessions'));
     const session = await store.create();
-    await store.setName(session.id, 'Beta to stable upgrade');
+    await store.setName(session.id, 'Upgrade persistence verification');
     await store.append(session.id, {role:'user',content:'Keep this conversation after upgrading.',timestamp:Date.now()});
     await store.close();
     const watchlist = new MarketService().add(instrumentFromId('binance-tradifi:NVDAUSDT'));
     const source = (await readFile('./skills/strategies/ma-trail-stop/strategy.ts','utf8')).replaceAll('ma-trail-stop','upgrade-preserved');
     const saved = await strategySaveDraftTool.execute('upgrade-save', {name:'upgrade-preserved',description:'Upgrade verification',source});
     assert.equal(saved.details.valid,true,JSON.stringify(saved.details.problems));
-    const candles = (await getKlinesTool.execute('real-candles',{symbol:'BTCUSDT',interval:'1h',limit:200})).details.candles.filter(c => c.closeTime < Date.now());
+    const candles = (await getKlinesTool.execute('real-candles',{symbol:'BTCUSDT',interval:'1h',limit:200})).details.candles
+      .filter(c => c.closeTime < Date.now())
+      .map(c => ({time:c.openTime,open:c.open,high:c.high,low:c.low,close:c.close,volume:c.volume}));
     assert.ok(candles?.length >= 100, 'Real Binance candles must be available');
     const loaded = await getStrategyByName('upgrade-preserved');
     const detail = await runBacktest({strategy:loaded.strategy,candles,initialCash:10000});
@@ -91,10 +100,11 @@ try {
   await writeFile(join(old.core, 'seed-upgrade.mjs'), seed);
   execFileSync(old.node, ['seed-upgrade.mjs'], { cwd: old.core, env, timeout: 60000, stdio: ['ignore', 'pipe', 'pipe'] });
   const expected = JSON.parse(await readFile(join(root, 'expected.json')));
+  let approvalMode = 'ask';
   async function verify(bundle, label) {
     active = await gateway(bundle);
     const sessions = await active.get('/api/sessions');
-    assert.equal(sessions.find(s => s.id === expected.sessionId)?.name, 'Beta to stable upgrade');
+    assert.equal(sessions.find(s => s.id === expected.sessionId)?.name, 'Upgrade persistence verification');
     const snapshot = await active.get(`/api/sessions/${expected.sessionId}/snapshot`);
     assert.ok(JSON.stringify(snapshot).includes('Keep this conversation after upgrading.'));
     const config = await active.get('/api/config');
@@ -107,13 +117,21 @@ try {
     assert.equal(strategy.source, expected.source);
     assert.ok((await active.get('/api/strategies/backtests?name=upgrade-preserved')).runs.some(r => r.id === expected.summary.id));
     assert.deepEqual(await active.get(`/api/strategies/backtests/get?id=${expected.summary.id}`), expected.detail);
+    if (bundle === current) {
+      assert.equal(snapshot.approvalMode, approvalMode, 'Chat permissions must survive upgrade and restart');
+      if (approvalMode === 'ask') {
+        const session = await active.post(`/api/sessions/${expected.sessionId}/approval-mode`, {mode:'allow-all'});
+        assert.equal(session.approvalMode, 'allow-all');
+        approvalMode = 'allow-all';
+      }
+    }
     await active.close(); active = null;
     console.log(`${label}: model metadata, conversation, watchlist, strategy source and ${expected.detail.candles} real-candle backtest details preserved`);
   }
-  await verify(old, 'Published Beta baseline');
-  await verify(current, '0.1.0 upgrade');
+  await verify(old, `${oldVersion} baseline`);
+  await verify(current, `${newVersion} upgrade`);
   await rm(old.core, { recursive: true, force: true });
-  await verify(current, '0.1.0 restart after removing old runtime');
+  await verify(current, `${newVersion} restart after removing old runtime`);
   console.log('Packaged upgrade passed without the checkout, system Node or old runtime');
 } finally {
   await active?.close();
