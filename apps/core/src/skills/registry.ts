@@ -55,7 +55,7 @@ async function readSummary(dir: string, dirPath: string): Promise<SkillSummary |
 
 /**
  * Scan a skills root: every immediate subdirectory with a SKILL.md becomes a
- * SkillSummary (frontmatter parsed, body NOT read). Sorted by priority asc so
+ * SkillSummary (frontmatter parsed, body not included in the catalog). Sorted by priority asc so
  * the system-prompt catalog surfaces the most important skills first.
  */
 export async function scanSkillsDir(skillsRoot: string): Promise<SkillSummary[]> {
@@ -94,7 +94,7 @@ export async function loadSkillBody(skillsRoot: string, dir: string): Promise<st
   return parseSkillMarkdown(raw).body;
 }
 
-/** In-memory skill registry: catalog + dispatch-time body/tool resolution. */
+/** In-memory skill registry: catalog + dispatch-time instruction loading. */
 export class SkillRegistry {
   private byName = new Map<string, SkillSummary>();
   private skillsRoot: string;
@@ -146,7 +146,7 @@ export class SkillRegistry {
     return { toolNames: out, unknownSkills };
   }
 
-  /** Every tool_name any skill could activate (superset for default runs). */
+  /** Legacy advisory tool references; these never activate tools. */
   allToolNames(): string[] {
     const seen = new Set<string>();
     for (const s of this.byName.values()) for (const t of s.toolNames) seen.add(t);

@@ -1,39 +1,12 @@
-/** Runtime tool catalog: only implemented capabilities ship in the release. */
+import { fileURLToPath } from 'node:url';
+import { ToolRegistry } from '../tools/registry.js';
+import { loadExtensions } from '../extensions/loader.js';
 
-import { ToolRegistry, type HarnessTool } from '../tools/registry.js';
-import { marketDataTools } from '../tools/market-data.js';
-import { marketExtendedTools } from '../tools/market-extended.js';
-import { dataSourceTools } from '../tools/data-sources.js';
-import { defiAdvancedTools } from '../tools/defi-advanced.js';
-import { hyperliquidTools } from '../tools/hyperliquid.js';
-import { onchainMarketTools } from '../tools/onchain-market.js';
-import { allArtifactTools } from '../tools/artifact/index.js';
-import { autopilotTools } from '../tools/autopilot.js';
-import { proactiveTools } from '../tools/proactive.js';
-import { memoryTools } from '../tools/memory.js';
-import { browserTools } from '../tools/browser.js';
-import { execTools } from '../tools/exec.js';
-import { marketsTools } from '../tools/markets.js';
-import { strategiesTools } from '../tools/strategies.js';
+export const bundledExtensionsRoot = fileURLToPath(new URL('../extensions/builtin/', import.meta.url));
 
-export function buildRegistry(): ToolRegistry {
-  const registry = new ToolRegistry();
-  const all = [
-    ...marketDataTools,
-    ...marketExtendedTools,
-    ...dataSourceTools,
-    ...defiAdvancedTools,
-    ...hyperliquidTools,
-    ...onchainMarketTools,
-    ...allArtifactTools,
-    ...autopilotTools,
-    ...proactiveTools,
-    ...memoryTools,
-    ...browserTools,
-    ...execTools,
-    ...marketsTools,
-    ...strategiesTools,
-  ] as HarnessTool[];
-  registry.registerAll(all);
-  return registry;
+/** Shared by the app and catalog checks. Services start only at app startup. */
+export async function buildRegistry(): Promise<ToolRegistry> {
+  const tools = new ToolRegistry();
+  await loadExtensions(tools, [bundledExtensionsRoot]);
+  return tools;
 }

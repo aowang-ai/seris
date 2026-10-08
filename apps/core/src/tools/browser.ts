@@ -106,7 +106,7 @@ async function pageState(p: Page) {
 /* --------------------------------- tools --------------------------------- */
 
 export const browserNavigateTool: HarnessTool = defineTool({
-  name: 'browser_navigate',
+  name: 'browser_navigate', approval: 'ask',
   description:
     'Navigate the controlled browser to a URL and return the loaded page title, URL, and a numbered accessibility snapshot of interactive elements. Use the refs with browser_click / browser_type.',
   category: 'browser',
@@ -144,7 +144,7 @@ export const browserSnapshotTool: HarnessTool = defineTool({
 });
 
 export const browserClickTool: HarnessTool = defineTool({
-  name: 'browser_click',
+  name: 'browser_click', approval: 'ask',
   description: 'Click an element by its ref number from browser_snapshot (or browser_navigate). Returns the new page state and snapshot.',
   category: 'browser',
   parameters: {
@@ -171,7 +171,7 @@ export const browserClickTool: HarnessTool = defineTool({
 });
 
 export const browserTypeTool: HarnessTool = defineTool({
-  name: 'browser_type',
+  name: 'browser_type', approval: 'ask',
   description: 'Type text into an input identified by snapshot ref. Optionally press Enter to submit.',
   category: 'browser',
   parameters: {
@@ -271,7 +271,7 @@ export const browserScrollTool: HarnessTool = defineTool({
 });
 
 export const browserBackTool: HarnessTool = defineTool({
-  name: 'browser_back',
+  name: 'browser_back', approval: 'ask',
   description: 'Go back in browser history. Returns the new page state.',
   category: 'browser',
   parameters: { type: 'object', properties: {} },

@@ -2,8 +2,8 @@
  * tools/registry.ts — central tool catalog, built on pi types.
  *
  * A HarnessTool is a pi AgentTool in pi's exact execute signature. All
- * tools are registered against the central registry and selected per-skill
- * by metadata.seris.tool_names via the skills system.
+ * extensions register tools; each conversation selects its active declarations.
+ * Skills supply instructions independently of tool availability.
  *
  * `defineTool` is kept as the single construction point — new tools should be
  * written in pi's signature (toolCallId, params, signal, onUpdate).
@@ -127,11 +127,14 @@ export interface LooseToolDef {
   description: string;
   category: ToolCategory;
   parameters: unknown;
+  defaultActive?: boolean;
+  approval?: 'ask' | 'none';
+  searchTerms?: string;
   execute: (
     toolCallId: string,
     params: unknown,
     signal?: AbortSignal,
-    onUpdate?: unknown,
+    onUpdate?: Parameters<HarnessTool['execute']>[3],
   ) => Promise<unknown> | unknown;
 }
 
@@ -141,6 +144,9 @@ export function defineTool(def: LooseToolDef): HarnessTool {
     label: def.label ?? def.name.replaceAll('_', ' '),
     description: def.description,
     category: def.category,
+    defaultActive: def.defaultActive,
+    approval: def.approval ?? 'none',
+    searchTerms: def.searchTerms,
     parameters: def.parameters as never,
     execute: async (toolCallId, params, signal, onUpdate) => {
       const activeSignal=signal ?? toolContext.getStore()?.signal;

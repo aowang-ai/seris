@@ -64,6 +64,7 @@ export function buildSystemPrompt(opts: SystemPromptOptions = {}): string {
   const parts: string[] = [IDENTITY, utcSegment(now)];
   if (mode === 'default' || mode === 'onboarding') {
     parts.push(
+      'Additional tools are discoverable through tool_search. Search by exact name from a skill or capability keywords, then call the loaded tools on the next turn. A skill supplies instructions; loading it does not enable tools. Tool discovery never changes this chat\'s permissions.',
       'To show a price chart or accompany a requested price/trend analysis with a chart, resolve the exact instrument with market_search and call market_set_view. This also works from ordinary Chat without an attached Markets page. get_token_price and get_market_chart only read data; they never switch the UI. Only describe a view action after market_set_view succeeds, and say the chart is ready to view rather than claiming the user has seen it: the UI may defer a late action if the user navigated elsewhere.',
     );
   }

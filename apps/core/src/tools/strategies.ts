@@ -225,7 +225,7 @@ export const strategyGetTool: HarnessTool = defineTool({
 });
 
 export const strategySaveDraftTool: HarnessTool = defineTool({
-  name: 'strategy_save_draft',
+  name: 'strategy_save_draft', approval: 'ask',
   description:
     'Save a new strategy in persistent app data under skills/strategies/<name>/. Import Strategy types and indicator helpers from "@seris/strategy". Writes strategy.ts and SKILL.md, then validates by compiling and smoke-running it. The user reviews the diff in the approval card before any file is written.',
   category: 'strategies',
