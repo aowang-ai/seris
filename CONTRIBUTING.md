@@ -32,13 +32,19 @@ Browser tools require Chrome or `SERIS_BROWSER_PATH`. Approved terminal actions 
 
 ## Checks
 
+Follow the repository's [agent guidelines](AGENTS.md): do not add or run tests unless they are necessary for the change. Prefer end-to-end validation with Computer Use in the actual client, using a configured real model and real market data where relevant. Document any environment blocker and what remains unverified.
+
+For low-risk documentation, copy or styling changes, use a focused review or visual check. Add automated tests only for concrete risks that are difficult to verify reliably through the UI; reuse existing test files and keep cases minimal. Do not create a test file for every feature or routinely run the full suite.
+
+Choose existing checks according to the affected code and risk:
+
 ```bash
 pnpm typecheck
 pnpm test
 pnpm audit --prod --audit-level high
 ```
 
-Desktop changes also require a native build and resource checks on the target platform:
+Build the native client when needed for end-to-end validation. Use the relevant native and resource checks for packaging, startup or release changes on the target platform:
 
 ```bash
 pnpm -C apps/desktop run build:app --bundles app
