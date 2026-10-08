@@ -1,7 +1,8 @@
 /** Browser-safe wire contract shared by the gateway and desktop UI. */
 import { isMarketAction, isMarketContext, parseContextInput, type MarketContext, type MarketContextInput, type MarketAction } from './markets/types.js';
-// v4 adds multiple model connections and model selection.
-export const PROTOCOL_VERSION = 4;
+// v5 adds persisted chat approval modes to session metadata and snapshots.
+export const PROTOCOL_VERSION = 5;
+export type ApprovalMode = 'ask' | 'allow-all';
 export type RunStatus = 'running' | 'awaiting-approval' | 'cancelling' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
 export interface RunRecord {
   id: string; sessionId: string; status: RunStatus; startedAt: number; endedAt?: number; error?: string;
@@ -12,7 +13,7 @@ export interface HistoryEntry {
   toolCallId?: string; toolName?: string; pending?: boolean; isError?: boolean;
   marketContext?: MarketContext; marketAction?: MarketAction;
 }
-export interface SessionMeta { id: string; name: string; createdAt: number; modifiedAt: number }
+export interface SessionMeta { id: string; name: string; createdAt: number; modifiedAt: number; approvalMode: ApprovalMode }
 export interface ApprovalRequest {
   id: string; sessionId: string; runId: string; toolCallId: string; toolName: string; args: unknown;
 }
@@ -25,7 +26,7 @@ export interface ChatEvent {
 }
 export interface Cursor { epoch: string; seq: number }
 export interface SessionSnapshot extends Cursor {
-  messages: HistoryEntry[]; run: RunRecord | null; approvals: ApprovalRequest[];
+  messages: HistoryEntry[]; run: RunRecord | null; approvals: ApprovalRequest[]; approvalMode: ApprovalMode;
 }
 export type ProviderKind =
   | 'anthropic'
@@ -109,7 +110,7 @@ export function isCursor(v: unknown): v is Cursor {
 export function isChatEvent(v: unknown): v is ChatEvent {
   if (!record(v) || !string(v.sessionId) || !string(v.runId)) return false;
   switch (v.type) {
-    case 'session-updated': return record(v.session) && v.session.id === v.sessionId && string(v.session.name) && Number.isFinite(v.session.createdAt) && Number.isFinite(v.session.modifiedAt);
+    case 'session-updated': return record(v.session) && v.session.id === v.sessionId && string(v.session.name) && Number.isFinite(v.session.createdAt) && Number.isFinite(v.session.modifiedAt) && isApprovalMode(v.session.approvalMode);
     case 'text-delta': return string(v.delta) && string(v.messageId);
     case 'message': return isHistoryEntry(v.message);
     case 'tool-start': return string(v.toolCallId) && string(v.toolName);
@@ -127,9 +128,11 @@ export function isHistoryEntry(v: unknown): v is HistoryEntry {
 export function isApproval(v: unknown): v is ApprovalRequest {
   return record(v) && ['id', 'sessionId', 'runId', 'toolCallId', 'toolName'].every(k => string(v[k]));
 }
+export function isApprovalMode(v: unknown): v is ApprovalMode { return v === 'ask' || v === 'allow-all'; }
 export function isSnapshot(v: unknown): v is SessionSnapshot {
   return isCursor(v) && record(v) && Array.isArray(v.messages) && v.messages.every(isHistoryEntry)
     && Array.isArray(v.approvals) && v.approvals.every(isApproval)
+    && isApprovalMode(v.approvalMode)
     && (v.run === null || isRunRecord(v.run));
 }
 export function parsePrompt(v: unknown): { text: string; requestId: string; marketContext?: MarketContextInput } {

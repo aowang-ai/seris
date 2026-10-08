@@ -5,10 +5,12 @@ import { useI18n } from '../i18n';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Markdown } from './Markdown';
 import { ApprovalCard } from './ApprovalCard';
+import { ApprovalModePicker } from './ApprovalModePicker';
 import { TextOutput } from './TextDetails';
 import { ModelPicker, connectionModelChoices } from './ModelPicker';
 import type {
   HistoryEntry,
+  ApprovalMode,
   ApprovalRequest,
   ModelConfig,
   ModelSelection,
@@ -20,6 +22,9 @@ import {
 } from '../../../core/src/markets/types';
 
 export interface ChatPanelProps {
+  approvalMode: ApprovalMode;
+  approvalModePending: boolean;
+  onApprovalMode: (mode: ApprovalMode) => void;
   modelConfig?: ModelConfig | null;
   onSelectModel?: (selection: ModelSelection) => void;
   onModelSettings?: () => void;
@@ -241,7 +246,7 @@ export function ChatPanel(p: ChatPanelProps) {
             disabled={!p.ready}
           />
           <div className="composer-controls">
-            <div className="flex min-w-0 items-center gap-2">
+            <div className="composer-options">
               {!!p.modelConfig?.selected && (
                 <ModelPicker
                   choices={connectionModelChoices(p.modelConfig!)}
@@ -270,6 +275,7 @@ export function ChatPanel(p: ChatPanelProps) {
                   <circle cx="12" cy="12.5" r="3" />
                 </svg>
               </button>
+              <ApprovalModePicker value={p.approvalMode} onChange={p.onApprovalMode} disabled={p.approvalModePending} />
               {p.runningModel && (
                 <span
                   className="max-w-[120px] truncate"
@@ -279,7 +285,7 @@ export function ChatPanel(p: ChatPanelProps) {
                 </span>
               )}
             </div>
-            <div>
+            <div className="composer-actions">
               {p.busy && (
                 <button type="button" onClick={p.onStop}>
                   {t('Stop')}
@@ -288,7 +294,7 @@ export function ChatPanel(p: ChatPanelProps) {
               <button
                 type="submit"
                 className="send-button"
-                disabled={!p.ready || p.busy || !p.draft.trim()}
+                disabled={!p.ready || p.busy || p.approvalModePending || !p.draft.trim()}
               >
                 {t('Send ↑')}
               </button>

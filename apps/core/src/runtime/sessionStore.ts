@@ -3,12 +3,17 @@ import { createSession, defineDoc, type ConversationId, type Cursor, type Sessio
 import { openNodeJsonlStorage } from '@earendil-works/pi-durable/storage/jsonl/node';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { Message } from '@earendil-works/pi-ai';
-import type { SessionMeta } from '../protocol.js';
+import type { ApprovalMode, SessionMeta } from '../protocol.js';
 
 const ChatMeta = defineDoc({
   kind: 'seris.chat', version: 1, scope: 'conversation', history: 'latest', fork: 'current',
-  initial: () => ({ name: 'New chat', createdAt: 0, modifiedAt: 0 }),
+  initial: () => ({ name: 'New chat', createdAt: 0, modifiedAt: 0, approvalMode: 'ask' as ApprovalMode }),
 });
+
+function metadata(id: string, meta: Omit<SessionMeta, 'id'>): SessionMeta {
+  // Existing v1 chat documents predate approval modes and keep asking by default.
+  return { id, ...meta, approvalMode: meta.approvalMode ?? 'ask' };
+}
 
 /** Pi owns JSONL transactions and recovery; Seris owns chat metadata and its agent loop. */
 export class SessionStore {
@@ -24,7 +29,7 @@ export class SessionStore {
       const conversation = await tx.createConversation({ ownership: { kind: 'ownerless' } });
       const meta = await tx.doc(ChatMeta, conversation.id);
       meta.createdAt = meta.modifiedAt = Date.now();
-      return { id: String(conversation.id), ...meta };
+      return metadata(String(conversation.id), meta);
     }, BACKGROUND_CONTEXT);
   }
 
@@ -36,7 +41,7 @@ export class SessionStore {
         const page = await tx.scanConversations({}, 100, cursor);
         for (const conversation of page.items) {
           const meta = await tx.doc(ChatMeta, conversation.id);
-          result.push({ id: String(conversation.id), ...meta });
+          result.push(metadata(String(conversation.id), meta));
         }
         cursor = page.next;
       } while (cursor);
@@ -45,7 +50,7 @@ export class SessionStore {
   }
 
   async metadata(id: string): Promise<SessionMeta> {
-    return this.session.commit(async tx => ({ id, ...await this.meta(tx, id) }), BACKGROUND_CONTEXT);
+    return this.session.commit(async tx => metadata(id, await this.meta(tx, id)), BACKGROUND_CONTEXT);
   }
 
   async setName(id: string, name: string, expectedName?: string): Promise<SessionMeta | undefined> {
@@ -54,7 +59,16 @@ export class SessionStore {
       if (expectedName !== undefined && meta.name !== expectedName) return;
       meta.name = name;
       meta.modifiedAt = Date.now();
-      return { id, ...meta };
+      return metadata(id, meta);
+    }, BACKGROUND_CONTEXT);
+  }
+
+  async setApprovalMode(id: string, approvalMode: ApprovalMode): Promise<SessionMeta> {
+    return this.session.commit(async tx => {
+      const meta = await this.meta(tx, id);
+      meta.approvalMode = approvalMode;
+      meta.modifiedAt = Date.now();
+      return metadata(id, meta);
     }, BACKGROUND_CONTEXT);
   }
 

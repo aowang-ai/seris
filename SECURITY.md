@@ -15,8 +15,16 @@ Desktop model credentials are stored in the operating system credential store.
 Local sessions, memory, installed skills and generated documents live in the
 user data directory. Never commit that directory or an `.env` file.
 
-The gateway binds to loopback and authenticates UI requests. Approval controls
-tool actions, but the approved terminal is a full shell under the user's account.
+The gateway binds to loopback and authenticates UI requests. New chats use
+**Ask every time** for gated actions such as saving strategies, terminal commands
+and browser interactions. The composer offers **Allow all actions** for the
+current chat; it persists across restarts and releases any pending tool approval
+in that chat. Switching back restores confirmation for subsequent gated actions.
+Only the authenticated UI API changes this permission mode; a model request
+cannot select it through prompt parameters. Chats have no runtime cap on model
+turns or tool calls, and the user can stop an active run from the composer.
+
+An allowed terminal is a full shell under the user's account.
 `execute_code` uses Node permission controls; it is not an operating system
 sandbox. Installed skill text and tool results should be treated as untrusted
 content. Run the application with the permissions needed for your work.

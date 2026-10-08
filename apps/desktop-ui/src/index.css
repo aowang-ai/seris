@@ -563,6 +563,7 @@
   margin-top: 8px;
   font-size: 10px;
   color: var(--muted-foreground);
+  gap: 12px;
 }
 .composer-controls div {
   display: flex;
@@ -572,6 +573,57 @@
 .composer-controls button {
   font-size: 11px;
 }
+.composer-controls > .composer-options {
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  column-gap: 10px;
+  row-gap: 6px;
+}
+.composer-controls > .composer-actions {
+  flex-shrink: 0;
+  align-self: flex-end;
+}
+.approval-mode-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  white-space: nowrap;
+  border-radius: 5px;
+}
+.approval-mode-trigger svg { flex-shrink: 0; }
+.approval-mode-trigger.allows-all { color: var(--foreground); }
+.approval-mode-trigger:hover:not(:disabled) { color: var(--foreground); }
+.approval-mode-trigger:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.approval-mode-popup {
+  width: 288px;
+  max-width: calc(100vw - 32px);
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--background);
+  color: var(--foreground);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 12%);
+}
+.approval-mode-heading {
+  padding: 7px 10px 9px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.approval-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 7px;
+  outline: none;
+  cursor: pointer;
+}
+.approval-mode-option[data-highlighted] { background: var(--secondary); }
+.approval-mode-check { display: flex; width: 14px; flex-shrink: 0; padding-top: 2px; }
+.approval-mode-copy { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.approval-mode-description { font-size: 11px; color: var(--muted-foreground); line-height: 1.5; }
 .send-button {
   padding: 5px 10px;
   border-radius: 7px;

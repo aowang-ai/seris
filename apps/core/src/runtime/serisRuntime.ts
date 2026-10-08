@@ -16,7 +16,7 @@ import { getAutopilotEngine } from '../autopilot/engine.js';
 import { defaultMemoryStore } from '../memory/store.js';
 import { generateSessionTitle } from './sessionTitle.js';
 import { SessionStore } from './sessionStore.js';
-import { isUntitledSessionName, sessionTitleFallback } from '../protocol.js';
+import { isApprovalMode, isUntitledSessionName, sessionTitleFallback, type ApprovalMode } from '../protocol.js';
 import type { KernelPair } from './streamFactory.js';
 import type { ModelSettings } from './modelSettings.js';
 import type { ModelConfig, ModelConnectionInput, ModelSelection } from '../protocol.js';
@@ -24,7 +24,7 @@ import type { ChatEvent, HistoryEntry, SessionMeta, RunRecord, Cursor, SessionSn
 import { isMarketAction, type MarketContext } from '../markets/types.js';
 export type { ChatEvent as CoreChatEvent, HistoryEntry as CoreHistoryEntry, SessionMeta as CoreSessionMeta } from '../protocol.js';
 
-export interface PromptOptions { toolAllowList?: string[]; maxSteps?: number; requestId?: string; marketContext?: MarketContext }
+export interface PromptOptions { toolAllowList?: string[]; requestId?: string; marketContext?: MarketContext }
 interface RunHandle { id: string; abort(): void; done: Promise<void> }
 export interface SerisRuntimeDeps {
   models?: MutableModels; model?: Model<Api>; modelSettings?: ModelSettings; tools: ToolRegistry; skills: SkillRegistry;
@@ -73,6 +73,17 @@ export class SerisRuntime {
   async listSessions(): Promise<SessionMeta[]> {
     return this.store.list();
   }
+  async setApprovalMode(sessionId: string, mode: ApprovalMode): Promise<SessionMeta> {
+    if (!isApprovalMode(mode)) throw new Error('Invalid approval mode');
+    return this.enqueue(sessionId, async () => {
+      const session = await this.store.setApprovalMode(sessionId, mode);
+      this.emit({ type: 'session-updated', sessionId, runId: this.runState(sessionId)?.id ?? '', session });
+      if (mode === 'allow-all') {
+        for (const approval of this.approvals.list(sessionId)) this.approvals.decide(approval.id, approval.runId, true);
+      }
+      return session;
+    });
+  }
   async createSession(): Promise<SessionMeta> {
     const session = await this.store.create();
     this.currentId = session.id;
@@ -109,7 +120,8 @@ export class SerisRuntime {
       const messages = await this.readHistory(id);
       const live = this.live.get(id);
       if (live) messages.push({ ...live });
-      return { ...cursor(), messages, run: this.runState(id), approvals: this.approvals.list(id) };
+      const session = await this.store.metadata(id);
+      return { ...cursor(), messages, run: this.runState(id), approvals: this.approvals.list(id), approvalMode: session.approvalMode };
     });
   }
   runState(id: string): RunRecord | null {
@@ -167,7 +179,6 @@ export class SerisRuntime {
     let error: string | undefined;
     let assistantIndex = 0;
     let assistantId = '';
-    let steps = 0;
     let answer = '';
     let titleAnswer = '';
     let titleSeed: { question: string; expectedName: string } | undefined;
@@ -205,9 +216,17 @@ export class SerisRuntime {
       const config: AgentLoopConfig = {
         model, reasoning: 'minimal', convertToLlm: msgs => msgs as Message[],
         transformContext: async msgs => {
-          const systems = msgs.filter(m => m.role === 'system');
+          const session = await this.enqueue(sessionId, () => this.store.metadata(sessionId));
+          const permission = session.approvalMode === 'allow-all'
+            ? 'The user selected Allow all actions for this chat. Carry out requested actions with the available tools without asking for per-action confirmation. The user can change this mode or stop the run in the interface.'
+            : 'This chat uses Ask every time. The interface requests approval when a tool needs it; submit the tool call so the user can review it there, rather than asking for duplicate confirmation in your response.';
+          const requestSystem = `${system}\n\n${permission}`;
+          // Pi also stores tool declarations in system messages. Replace only
+          // our leading prompt and preserve those declarations unchanged.
+          const systems = msgs.filter(m => m.role === 'system').map((message, index) =>
+            index === 0 ? { ...message, content: requestSystem } : message);
           const raw = msgs.filter(m => m.role !== 'system');
-          const budget = Math.floor(model.contextWindow * 0.8) - model.maxTokens - Math.ceil(system.length / 3) - Math.ceil(JSON.stringify(toolSet.map(t => ({name:t.name,description:t.description,parameters:t.parameters}))).length / 3);
+          const budget = Math.floor(model.contextWindow * 0.8) - model.maxTokens - Math.ceil(requestSystem.length / 3) - Math.ceil(JSON.stringify(toolSet.map(t => ({name:t.name,description:t.description,parameters:t.parameters}))).length / 3);
           if (!Number.isFinite(budget) || budget < 1000) throw new Error('Model context budget is too small for the configured tools and output');
           const compacted = await compactIfNeeded({ sessionId, messages: raw, windowTokens: budget });
           return [...systems, ...compacted.messages];
@@ -215,15 +234,21 @@ export class SerisRuntime {
         beforeToolCall: async ({ toolCall, args }) => {
           abort.signal.throwIfAborted();
           if (!requiresApproval(toolCall.name)) return;
-          this.records[runId].status = 'awaiting-approval'; this.saveRuns();
-          const allowed = await this.approvals.request({ sessionId, runId, toolCallId: toolCall.id, toolName: toolCall.name, args }, abort.signal,
-            approval => emit({ type: 'approval', status: 'awaiting-approval', approval }));
+          let decision: Promise<boolean> | undefined;
+          await this.enqueue(sessionId, async () => {
+            abort.signal.throwIfAborted();
+            const session = await this.store.metadata(sessionId);
+            abort.signal.throwIfAborted();
+            if (session.approvalMode === 'allow-all') return;
+            this.records[runId].status = 'awaiting-approval'; this.saveRuns();
+            decision = this.approvals.request({ sessionId, runId, toolCallId: toolCall.id, toolName: toolCall.name, args }, abort.signal,
+              approval => emit({ type: 'approval', status: 'awaiting-approval', approval }));
+          });
+          if (!decision) return;
+          const allowed = await decision;
           abort.signal.throwIfAborted();
           this.records[runId].status = 'running'; this.saveRuns();
           return allowed ? undefined : { block: true, reason: 'User declined this action', terminate: true };
-        },
-        finishTurn: async ({message,toolResults}) => {
-          if (++steps >= (opts.maxSteps ?? 32) && message.content.some(c=>c.type==='toolCall') && !toolResults.some(r=>r.isError)) throw new Error('Run reached its step limit');
         },
       };
       await runAgentLoop([user], context, config, async (ev: AgentEvent) => {

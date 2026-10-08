@@ -16,6 +16,7 @@ import {
   type HistoryEntry,
   type RunRecord,
   type ApprovalRequest,
+  type ApprovalMode,
   type ModelConfig,
   type MarketsState,
 } from './seris';
@@ -141,6 +142,8 @@ export function App() {
   const [messages, setMessages] = useState<Record<string, HistoryEntry[]>>({});
   const [runs, setRuns] = useState<Record<string, RunRecord | null>>({});
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
+  const [newApprovalMode, setNewApprovalMode] = useState<ApprovalMode>('ask');
+  const [savingApprovalMode, setSavingApprovalMode] = useState(false);
   const [goals, setGoals] = useState<
     { id: string; status: string; reason: string; payload: unknown }[]
   >([]);
@@ -275,6 +278,7 @@ export function App() {
     loaded.current.add(id);
     setMessages((m) => ({ ...m, [id]: snapshotMessages(snapshot) }));
     setRuns((r) => ({ ...r, [id]: snapshot.run }));
+    setSessions(list => list.map(session => session.id === id ? { ...session, approvalMode: snapshot.approvalMode } : session));
     setApprovals((a) => [
       ...a.filter((p) => p.sessionId !== id),
       ...snapshot.approvals,
@@ -298,6 +302,9 @@ export function App() {
           setSessions((list) =>
             list.map((s) => (s.id === e.sessionId ? e.session! : s)),
           );
+          if (e.session.approvalMode === 'allow-all') {
+            setApprovals(list => list.filter(approval => approval.sessionId !== e.sessionId));
+          }
           return;
         }
         setMessages((m) => ({
@@ -381,6 +388,7 @@ export function App() {
           loaded.current.add(id);
           setMessages((m) => ({ ...m, [id]: snapshotMessages(snapshot) }));
           setRuns((r) => ({ ...r, [id]: snapshot.run }));
+          setSessions(list => list.map(session => session.id === id ? { ...session, approvalMode: snapshot.approvalMode } : session));
           setApprovals((a) => [
             ...a.filter((p) => p.sessionId !== id),
             ...snapshot.approvals,
@@ -497,7 +505,7 @@ export function App() {
   const send = useCallback(async () => {
     const submittedDraft = draft;
     const text = draft.trim();
-    if (!text || busy) return;
+    if (!text || busy || savingApprovalMode) return;
     const sendingKey = currentId ?? 'new';
     setSending((s) => ({ ...s, [sendingKey]: true }));
     setNotice('');
@@ -527,6 +535,10 @@ export function App() {
         setDrafts((d) => ({ ...d, [s.id]: d[sendingKey] ?? submittedDraft }));
         setCurrentId(sid);
         currentRef.current = sid;
+        if (newApprovalMode !== 'ask') {
+          const updated = await seris.setApprovalMode(sid, newApprovalMode);
+          setSessions(list => list.map(session => session.id === sid ? updated : session));
+        }
         await restore(sid);
       }
       const pending =
@@ -570,7 +582,22 @@ export function App() {
         return next;
       });
     }
-  }, [draft, busy, currentId, restore, view]);
+  }, [draft, busy, currentId, restore, view, savingApprovalMode, newApprovalMode]);
+  const changeApprovalMode = async (mode: ApprovalMode) => {
+    const sessionId = currentId;
+    if (!sessionId) { setNewApprovalMode(mode); return; }
+    if (savingApprovalMode) return;
+    setSavingApprovalMode(true);
+    try {
+      const updated = await seris.setApprovalMode(sessionId, mode);
+      setSessions(list => list.map(session => session.id === sessionId ? updated : session));
+      await restore(sessionId);
+    } catch (e) {
+      setNotice(String(e));
+    } finally {
+      setSavingApprovalMode(false);
+    }
+  };
   const decide = async (p: ApprovalRequest, allowed: boolean) => {
     try {
       await seris.approve(p.id, p.runId, allowed);
@@ -597,6 +624,9 @@ export function App() {
   };
   const chat = (compact = false) => (
     <ChatPanel
+      approvalMode={sessions.find(session => session.id === currentId)?.approvalMode ?? (currentId ? 'ask' : newApprovalMode)}
+      approvalModePending={savingApprovalMode || !!sending['new']}
+      onApprovalMode={mode => void changeApprovalMode(mode)}
       modelConfig={config}
       onSelectModel={selection=>{void seris.selectModel(selection).then(setConfig).catch(e=>setNotice(String(e)));}}
       onModelSettings={()=>setView('settings')}

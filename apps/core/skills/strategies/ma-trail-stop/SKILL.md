@@ -27,8 +27,10 @@ This strategy is the canonical example of the Seris strategy contract:
 ## Creating a variant
 
 Import `Strategy`, `Candle` and indicator helpers from `@seris/strategy`.
-Use `strategy_save_draft` with a new name and review the source in its approval
-card. Drafts are saved in persistent app data, separately from this bundled example.
+Use `strategy_save_draft` with a new name. In Ask every time mode, its approval
+card lets the user review the source before saving; Allow all actions mode saves
+without per-action confirmation. Drafts are saved in persistent app data,
+separately from this bundled example.
 
 ## Tuning hints
 

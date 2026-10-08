@@ -9,10 +9,10 @@ import type {
   MarketRule,
   MarketNews,
 } from '../../core/src/markets/types';
-import { PROTOCOL_VERSION, isModelConfig, isChatEvent, isCursor, isSnapshot, type ChatEvent, type Cursor, type SessionMeta, type SessionSnapshot, type ModelConfig, type ModelConnectionInput, type ModelSelection, type ProviderInfo, type ModelDiscovery, type LocalModelService } from '../../core/src/protocol';
+import { PROTOCOL_VERSION, isModelConfig, isChatEvent, isCursor, isSnapshot, type ApprovalMode, type ChatEvent, type Cursor, type SessionMeta, type SessionSnapshot, type ModelConfig, type ModelConnectionInput, type ModelSelection, type ProviderInfo, type ModelDiscovery, type LocalModelService } from '../../core/src/protocol';
 import type { BacktestRunSummary } from '../../core/src/strategy/types';
 import type { BacktestResult } from '../../core/src/strategy/runner';
-export type { SessionMeta, HistoryEntry, RunRecord, ApprovalRequest, ModelConfig, ModelConnectionInput, ModelSelection, ProviderInfo, ConnectionStatus, ModelOption, LocalModelService } from '../../core/src/protocol';
+export type { ApprovalMode, SessionMeta, HistoryEntry, RunRecord, ApprovalRequest, ModelConfig, ModelConnectionInput, ModelSelection, ProviderInfo, ConnectionStatus, ModelOption, LocalModelService } from '../../core/src/protocol';
 export type { BacktestRunSummary };
 export type BacktestRunDetail = BacktestResult;
 declare global {
@@ -110,6 +110,7 @@ export const seris={
 
   listSessions:()=>call<SessionMeta[]>('/api/sessions'),
   createSession:()=>call<SessionMeta>('/api/sessions',{method:'POST',body:'{}'}),
+  setApprovalMode:(id:string,mode:ApprovalMode)=>call<SessionMeta>(`/api/sessions/${id}/approval-mode`,post({mode})),
   snapshot:async(id:string):Promise<SessionSnapshot>=>{const s=await call<unknown>(`/api/sessions/${id}/snapshot`);if(!isSnapshot(s))throw new Error('Invalid session snapshot');return s;},
   config:async()=>{const c=await call<unknown>('/api/config');if(!isModelConfig(c))throw new Error('Invalid model configuration');return c;},
   providers:()=>call<ProviderInfo[]>('/api/config/providers'),
