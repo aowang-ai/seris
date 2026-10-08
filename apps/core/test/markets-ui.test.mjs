@@ -739,10 +739,11 @@ test('ordinary Chat opens Markets only for typed view actions and keeps its conv
       .getByLabel('消息', { exact: true })
       .fill('Show NVDA then BTC weekly');
     assert.equal(
-      await page.getByRole('button', { name: '发送 ↑', exact: true }).isDisabled(),
-      true,
-      'a newly created session stays busy until the first receipt is restored',
+      await page.getByRole('button', { name: '发送 ↑', exact: true }).count(),
+      0,
+      'a newly created session cannot send again until the first receipt is restored',
     );
+    assert.equal(await page.getByRole('button', { name: '停止', exact: true }).count(), 1);
     firstReceipt.resolve();
     await until(async () =>
       await page.getByRole('button', { name: '停止', exact: true }).count() === 0,

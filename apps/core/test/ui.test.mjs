@@ -183,7 +183,7 @@ test('built UI discovers models, saves multiple choices, scopes blank keys, and 
       .waitFor();
     const sessionId = (await runtime.listSessions())[0].id;
     await page
-      .locator('.seris-composer > input')
+      .getByLabel('Message', { exact: true })
       .fill('Keep this unsent draft');
     await page.getByRole('combobox', { name: 'Model', exact: true }).click();
     await page
@@ -320,7 +320,7 @@ test('built UI discovers models, saves multiple choices, scopes blank keys, and 
     );
     await page.getByRole('button', { name: 'Chat', exact: true }).click();
     assert.equal(
-      await page.locator('.seris-composer > input').inputValue(),
+      await page.getByLabel('Message', { exact: true }).inputValue(),
       'Keep this unsent draft',
     );
     await page.getByRole('combobox', { name: 'Model', exact: true }).click();
