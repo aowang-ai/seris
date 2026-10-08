@@ -37,3 +37,5 @@ backtests must not be presented as executed trades or live portfolio returns.
 Run `pnpm audit --prod` for JavaScript dependencies and review Rust advisories
 when updating native dependencies. A failed audit connection is not a clean
 audit result. See [contributor checks](CONTRIBUTING.md#checks) for build and dependency checks.
+
+Website: https://seris.im

@@ -70,3 +70,5 @@ Issues should include the operating system, app version, reproduction steps and 
 Preserve upstream licenses and notices when importing code or assets. Record the source, version, license and modifications in your pull request. Do not contribute proprietary code, prompts or skill instructions without redistribution rights.
 
 Contributions use the [project license](LICENSE). Seris branding has the separate terms in [the brand license](apps/desktop-ui/public/brand/LICENSE.md).
+
+Website: https://seris.im

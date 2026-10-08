@@ -5,15 +5,18 @@
   </picture>
 </p>
 
-<h1 align="center">Your AI market research desk.</h1>
+<h1 align="center">Seris — open-source desktop AI trading assistant</h1>
 
 <p align="center">
-  Talk through a market move, open its chart, and turn an idea into a local backtest.<br>
-  An open-source desktop app for researching crypto, stocks, ETFs, commodities, FX and indices.
+  Your AI market research desk: talk through a market move, open its chart, and turn an idea into a local backtest.<br>
+  Crypto, stocks, ETFs, commodities, FX and indices · bring your own model.
 </p>
 
 <p align="center">
+  <a href="https://seris.im"><strong>seris.im</strong></a> ·
   <a href="https://github.com/aowang-ai/seris/releases/latest"><strong>Download for macOS</strong></a> ·
+  <a href="https://seris.im/docs/">Docs</a> ·
+  <a href="https://seris.im/zh/">中文</a> ·
   <a href="#explore-the-markets">Watch the walkthrough</a> ·
   <a href="#development">Build from source</a>
 </p>
