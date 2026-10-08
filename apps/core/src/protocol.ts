@@ -13,7 +13,19 @@ export interface HistoryEntry {
   toolCallId?: string; toolName?: string; pending?: boolean; isError?: boolean;
   marketContext?: MarketContext; marketAction?: MarketAction;
 }
-export interface SessionMeta { id: string; name: string; createdAt: number; modifiedAt: number; approvalMode: ApprovalMode }
+export interface SessionMeta {
+  id: string; name: string; createdAt: number; modifiedAt: number; approvalMode: ApprovalMode;
+  preview?: string; pinnedAt?: number; deletedAt?: number; customName?: boolean;
+}
+export interface SessionUpdateInput { name?: string; pinned?: boolean; deleted?: boolean }
+export function isSessionUpdate(v: unknown): v is SessionUpdateInput {
+  return record(v) && Object.keys(v).length > 0 && Object.keys(v).every(key => ['name', 'pinned', 'deleted'].includes(key))
+    && (v.name === undefined || (string(v.name) && v.name.trim().length > 0 && v.name.trim().length <= 160))
+    && (v.pinned === undefined || typeof v.pinned === 'boolean') && (v.deleted === undefined || typeof v.deleted === 'boolean');
+}
+export function compareSessions(a: SessionMeta, b: SessionMeta): number {
+  return (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || b.modifiedAt - a.modifiedAt;
+}
 export interface ApprovalRequest {
   id: string; sessionId: string; runId: string; toolCallId: string; toolName: string; args: unknown;
 }
@@ -110,7 +122,13 @@ export function isCursor(v: unknown): v is Cursor {
 export function isChatEvent(v: unknown): v is ChatEvent {
   if (!record(v) || !string(v.sessionId) || !string(v.runId)) return false;
   switch (v.type) {
-    case 'session-updated': return record(v.session) && v.session.id === v.sessionId && string(v.session.name) && Number.isFinite(v.session.createdAt) && Number.isFinite(v.session.modifiedAt) && isApprovalMode(v.session.approvalMode);
+    case 'session-updated': {
+      const session = v.session;
+      return record(session) && session.id === v.sessionId && string(session.name) && Number.isFinite(session.createdAt) && Number.isFinite(session.modifiedAt) && isApprovalMode(session.approvalMode)
+        && (session.preview === undefined || string(session.preview))
+        && ['pinnedAt', 'deletedAt'].every(key => session[key] === undefined || (Number.isFinite(session[key]) && Number(session[key]) >= 0))
+        && (session.customName === undefined || typeof session.customName === 'boolean');
+    }
     case 'text-delta': return string(v.delta) && string(v.messageId);
     case 'message': return isHistoryEntry(v.message);
     case 'tool-start': return string(v.toolCallId) && string(v.toolName);
@@ -183,4 +201,14 @@ export function isUntitledSessionName(name: string): boolean {
 export function sessionTitleFallback(text: string): string {
   const chars = Array.from(text.replace(/\s+/g, ' ').trim());
   return chars.slice(0, 48).join('') + (chars.length > 48 ? '…' : '');
+}
+
+/** A lightweight list preview, without fetching the full transcript or calling a model. */
+export function sessionPreviewText(text: string): string {
+  const plain = text
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^\s{0,3}(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/gm, '')
+    .replace(/\*\*|__|~~|`/g, '')
+    .replace(/\s+/g, ' ').trim();
+  return Array.from(plain).slice(0, 120).join('');
 }

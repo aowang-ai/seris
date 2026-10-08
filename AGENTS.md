@@ -66,6 +66,9 @@ These are available commands, not a checklist to run for every change. See the v
 - Reuse existing components, Base UI primitives, theme styles and brand assets. Keep focus handling, keyboard navigation and accessible names intact.
 - Add user-facing strings through the localization helpers and update both English and Chinese translations. Keep technical implementation details out of normal product flows.
 - Keep controls compact and aligned, and check the narrower Markets chat layout when changing shared composer controls.
+- Show a one-line plaintext preview for every nonempty chat before it is opened. Store previews with session metadata rather than loading every transcript into the sidebar.
+- Keep chat actions in an ellipsis/context menu. Persist pinned positions and manual names; move deleted chats to Recently deleted so their messages and permissions can be restored.
+- In the chat composer, place the short permission control on the left and model selection plus submit/stop on the right. Keep model settings inside the model menu and use orange to distinguish Allow all. Support multiline input with Enter to send and Shift+Enter for a new line.
 - Enter must not send a message while an input method is composing or confirming text. Preserve Chinese IME behavior in chat, search and model selection.
 - Avoid triangle-based disclosure controls in settings and ordinary forms. Expandable details in chat are acceptable; use the established icon, label and right-side chevron treatment.
 

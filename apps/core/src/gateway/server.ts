@@ -7,7 +7,7 @@ import { randomBytes } from 'node:crypto';
 import type { SerisRuntime } from '../runtime/serisRuntime.js';
 import { mintBearerToken, verifyBearer, type BearerToken } from './token.js';
 import { EventHub } from './events.js';
-import { isApprovalMode, parsePrompt, PROTOCOL_VERSION } from '../protocol.js';
+import { isApprovalMode, isSessionUpdate, parsePrompt, PROTOCOL_VERSION } from '../protocol.js';
 import { providerCatalog } from '../runtime/streamFactory.js';
 import { detectLocalModels } from '../runtime/modelDiscovery.js';
 import { marketRoute } from './markets.js';
@@ -84,13 +84,18 @@ export async function startGateway(opts:GatewayOptions):Promise<GatewayHandle>{
       }
       sendJson(res,200,{ok:true});return;
     }
-    if(path==='/api/sessions'&&method==='GET'){sendJson(res,200,await runtime.listSessions());return;}
+    if(path==='/api/sessions'&&method==='GET'){sendJson(res,200,await runtime.listSessions(url.searchParams.get('deleted')==='1'));return;}
     if(path==='/api/sessions'&&method==='POST'){sendJson(res,201,await runtime.createSession());return;}
-    const m=/^\/api\/sessions\/([A-Za-z0-9_-]+)\/(history|snapshot|prompt|abort|approval-mode)$/.exec(path);
+    const m=/^\/api\/sessions\/([A-Za-z0-9_-]+)\/(history|snapshot|prompt|abort|approval-mode|manage)$/.exec(path);
     if(m){
       const [,id,action]=m;
       if(action==='history'&&method==='GET'){sendJson(res,200,await runtime.sessionHistory(id));return;}
       if(action==='snapshot'&&method==='GET'){sendJson(res,200,await runtime.snapshot(id,()=>hub.cursor()));return;}
+      if(action==='manage'&&method==='POST'){
+        const body=await readBody(req);
+        if(!isSessionUpdate(body))throw new Error('Invalid chat update');
+        sendJson(res,200,await runtime.updateSession(id,body));return;
+      }
       if(action==='approval-mode'&&method==='POST'){
         const body=await readBody(req);
         if(!isApprovalMode(body.mode))throw new Error('Invalid approval mode');

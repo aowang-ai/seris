@@ -36,6 +36,7 @@ export function ModelPicker({
   choices,
   value,
   onChange,
+  onSettings,
   disabled,
   compact = false,
   favorites = false,
@@ -43,12 +44,14 @@ export function ModelPicker({
   choices: ModelChoice[];
   value: ModelSelection | null;
   onChange: (selection: ModelSelection) => void;
+  onSettings?: () => void;
   disabled?: boolean;
   compact?: boolean;
   favorites?: boolean;
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
   const [pins, setPins] = useState<string[]>(() => {
     try {
       const p = JSON.parse(localStorage.getItem('seris.pinnedModels') ?? '[]');
@@ -91,7 +94,8 @@ export function ModelPicker({
       autoHighlight
       inputValue={query}
       onInputValueChange={setQuery}
-      onOpenChange={() => setQuery('')}
+      open={open}
+      onOpenChange={next => { setOpen(next); setQuery(''); }}
       itemToStringLabel={(c) => `${c.model.name} ${c.model.id} ${c.group}`}
       isItemEqualToValue={(a, b) => a.key === b.key}
       onValueChange={(c) => {
@@ -105,7 +109,7 @@ export function ModelPicker({
         }
         className={
           compact
-            ? 'flex min-w-0 max-w-[240px] items-center gap-1.5 text-[11px] outline-none'
+            ? 'composer-model-trigger'
             : 'flex w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-[13px] outline-none focus-visible:border-ring'
         }
       >
@@ -129,11 +133,12 @@ export function ModelPicker({
       </Combobox.Trigger>
       <Combobox.Portal>
         <Combobox.Positioner
-          sideOffset={8}
-          align="start"
+          side={compact ? 'top' : 'bottom'}
+          sideOffset={10}
+          align={compact ? 'end' : 'start'}
           className="z-[60] outline-none"
         >
-          <Combobox.Popup className="w-[340px] max-w-[calc(100vw-32px)] origin-[var(--transform-origin)] overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-lg transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 motion-reduce:transition-none">
+          <Combobox.Popup className={`model-picker-popup ${compact ? 'composer-model-popup' : ''} w-[340px] max-w-[calc(100vw-32px)] origin-[var(--transform-origin)] overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-lg transition-[opacity,transform] duration-150 data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 motion-reduce:transition-none`}>
             <div className="border-b border-border p-2">
               <Combobox.Input
                 aria-label={t('Search models')}
@@ -161,12 +166,12 @@ export function ModelPicker({
                           <span className="block truncate">
                             {choice.model.name}
                           </span>
-                          <span className="block truncate text-[10px] text-muted-foreground">
+                          {choice.model.id !== choice.model.name && <span className="block truncate text-[10px] text-muted-foreground">
                             {choice.model.id}
-                          </span>
+                          </span>}
                         </span>
                         <Combobox.ItemIndicator aria-hidden="true">
-                          ✓
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6" /></svg>
                         </Combobox.ItemIndicator>
                         {favorites && (
                           <button
@@ -198,6 +203,14 @@ export function ModelPicker({
                 </Combobox.Group>
               )}
             </Combobox.List>
+            {onSettings && (
+              <div className="model-picker-footer">
+                <button type="button" onClick={() => { setOpen(false); onSettings(); }}>
+                  <span>{t('Model settings')}</span>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+                </button>
+              </div>
+            )}
           </Combobox.Popup>
         </Combobox.Positioner>
       </Combobox.Portal>

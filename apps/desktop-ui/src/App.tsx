@@ -23,9 +23,13 @@ import {
 import { applyChatEvent, snapshotMessages } from './chatState';
 import {
   isUntitledSessionName,
+  compareSessions,
+  sessionPreviewText,
   sessionTitleFallback,
   type Cursor,
+  type SessionUpdateInput,
 } from '../../core/src/protocol';
+import { DeletedChats, SessionList } from './components/SessionList';
 
 interface CoreStatus {
   ready: boolean;
@@ -102,15 +106,21 @@ function fmtTime(ts: number, locale: string): string {
   );
 }
 
-/** one line of plaintext from a message list (last assistant>user>any) */
+/** Prefer the newest visible message while streaming; saved previews cover unopened chats. */
 function sessionPreview(msgs: { role: string; text: string }[]): string {
-  if (!msgs || msgs.length === 0) return '';
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i];
-    if (m.role === 'assistant') return m.text.replace(/\s+/g, ' ').slice(0, 80);
+    if (m.role !== 'assistant' && m.role !== 'user') continue;
+    const preview = sessionPreviewText(m.text);
+    if (preview) return preview;
   }
-  const last = msgs[msgs.length - 1];
-  return last.text.replace(/\s+/g, ' ').slice(0, 80);
+  return '';
+}
+
+function reconcileSession(list: SessionMeta[], session: SessionMeta): SessionMeta[] {
+  const next = list.filter(row => row.id !== session.id);
+  if (!session.deletedAt) next.push(session);
+  return next.sort(compareSessions);
 }
 
 export function App() {
@@ -299,9 +309,21 @@ export function App() {
           return;
         watermarks.current[e.sessionId] = { ...cursor };
         if (e.type === 'session-updated' && e.session) {
-          setSessions((list) =>
-            list.map((s) => (s.id === e.sessionId ? e.session! : s)),
-          );
+          setSessions(list => reconcileSession(list, e.session!));
+          if (e.session.deletedAt) {
+            if (currentRef.current === e.sessionId) {
+              currentRef.current = null;
+              setCurrentId(null);
+              setNewApprovalMode('ask');
+            }
+            if (marketSessionRef.current === e.sessionId) {
+              marketSessionRef.current = null;
+              setMarketSession(null);
+              localStorage.removeItem('seris.marketSession');
+              setMarketChatOpen(false);
+            }
+            setApprovals(list => list.filter(approval => approval.sessionId !== e.sessionId));
+          }
           if (e.session.approvalMode === 'allow-all') {
             setApprovals(list => list.filter(approval => approval.sessionId !== e.sessionId));
           }
@@ -456,7 +478,7 @@ export function App() {
   const newSession = useCallback(async () => {
     try {
       const s = await seris.createSession();
-      setSessions((p) => [s, ...p]);
+      setSessions(p => reconcileSession(p, s));
       setCurrentId(s.id);
       currentRef.current = s.id;
       setView('chat');
@@ -486,7 +508,7 @@ export function App() {
       if (!id || !list.some((s) => s.id === id)) {
         const session = await seris.createSession();
         id = session.id;
-        setSessions((p) => [session, ...p]);
+        setSessions(p => reconcileSession(p, session));
         setMarketSession(id);
         marketSessionRef.current = id;
         localStorage.setItem('seris.marketSession', id);
@@ -528,7 +550,7 @@ export function App() {
       if (!sid) {
         const s = await seris.createSession();
         sid = s.id;
-        setSessions((p) => [s, ...p]);
+        setSessions(p => reconcileSession(p, s));
         // Keep the first request busy after the composer switches from the
         // unsaved draft to its new session, and carry any text typed meanwhile.
         setSending((p) => ({ ...p, [s.id]: true }));
@@ -596,6 +618,15 @@ export function App() {
       setNotice(String(e));
     } finally {
       setSavingApprovalMode(false);
+    }
+  };
+  const updateSession = async (id: string, changes: SessionUpdateInput) => {
+    const session = await seris.updateSession(id, changes);
+    setSessions(list => reconcileSession(list, session));
+    if (session.deletedAt && currentRef.current === id) {
+      currentRef.current = null;
+      setCurrentId(null);
+      setNewApprovalMode('ask');
     }
   };
   const decide = async (p: ApprovalRequest, allowed: boolean) => {
@@ -765,9 +796,10 @@ export function App() {
         {view === 'chat' && !sidebarCollapsed && (
           <div className="mt-5 flex min-h-0 flex-1 flex-col">
             <div className="flex items-center justify-between px-4 pb-2">
-              <span className="text-[11px] text-muted-foreground">
-                {t('Sessions')}
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] text-muted-foreground">{t('Sessions')}</span>
+                <DeletedChats load={seris.listDeletedSessions} onRestore={id => updateSession(id, { deleted: false })} />
+              </div>
               <button
                 onClick={newSession}
                 className="rounded-md px-2 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
@@ -786,40 +818,17 @@ export function App() {
                   {t('Start one — or just ask something below.')}
                 </div>
               )}
-              {sessions.map((s) => {
-                const preview = sessionPreview(messages[s.id] ?? []);
-                const name = isUntitledSessionName(s.name)
+              <SessionList currentId={currentId} onSelect={id => { void switchTo(id); }} onUpdate={updateSession} rows={sessions.map(s => ({
+                session: s,
+                preview: sessionPreview(messages[s.id] ?? []) || s.preview || '',
+                time: fmtTime(s.modifiedAt, locale),
+                name: !s.customName && isUntitledSessionName(s.name)
                   ? sessionTitleFallback(
                       (messages[s.id] ?? []).find((m) => m.role === 'user')
                         ?.text ?? '',
                     ) || t('New chat')
-                  : s.name;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => void switchTo(s.id)}
-                    className={`block w-full rounded-md px-2.5 py-2 text-left transition-colors ${
-                      s.id === currentId
-                        ? 'bg-secondary text-foreground'
-                        : 'text-foreground/80 hover:bg-secondary/60 hover:text-foreground'
-                    }`}
-                  >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span title={name} className="truncate text-[13px]">
-                        {name}
-                      </span>
-                      <span className="flex-shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                        {fmtTime(s.modifiedAt, locale)}
-                      </span>
-                    </div>
-                    {preview && (
-                      <div className="mt-1 truncate text-[11px] leading-snug text-muted-foreground">
-                        {preview}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
+                  : s.name,
+              }))} />
             </div>
           </div>
         )}

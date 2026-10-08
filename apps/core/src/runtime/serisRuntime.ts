@@ -14,7 +14,7 @@ import { toolContext } from './toolContext.js';
 import { workspaceRoot } from './paths.js';
 import { generateSessionTitle } from './sessionTitle.js';
 import { SessionStore } from './sessionStore.js';
-import { isApprovalMode, isUntitledSessionName, sessionTitleFallback, type ApprovalMode } from '../protocol.js';
+import { isApprovalMode, isSessionUpdate, isUntitledSessionName, sessionTitleFallback, type ApprovalMode, type SessionUpdateInput } from '../protocol.js';
 import type { KernelPair } from './streamFactory.js';
 import type { ModelSettings } from './modelSettings.js';
 import type { ModelConfig, ModelConnectionInput, ModelSelection } from '../protocol.js';
@@ -74,8 +74,20 @@ export class SerisRuntime {
     this.chains.set(id, next.catch(() => undefined));
     return next;
   }
-  async listSessions(): Promise<SessionMeta[]> {
-    return this.store.list();
+  async listSessions(deleted = false): Promise<SessionMeta[]> {
+    return this.store.list(deleted);
+  }
+  async updateSession(sessionId: string, changes: SessionUpdateInput): Promise<SessionMeta> {
+    if (!isSessionUpdate(changes)) throw new Error('Invalid chat update');
+    return this.enqueue(sessionId, async () => {
+      if (changes.deleted) {
+        this.runners.get(sessionId)?.abort();
+        this.titleTasks.get(sessionId)?.abort.abort();
+      }
+      const session = await this.store.update(sessionId, changes);
+      this.emit({ type: 'session-updated', sessionId, runId: this.runState(sessionId)?.id ?? '', session });
+      return session;
+    });
   }
   async setApprovalMode(sessionId: string, mode: ApprovalMode): Promise<SessionMeta> {
     if (!isApprovalMode(mode)) throw new Error('Invalid approval mode');
@@ -194,7 +206,8 @@ export class SerisRuntime {
       const history = await this.enqueue(sessionId, async () => {
         const history = (await this.entries(sessionId)).map(e => e.message);
         const meta = await this.store.metadata(sessionId);
-        if (isUntitledSessionName(meta.name)) {
+        if (meta.deletedAt) throw new Error('Restore this chat before sending a message');
+        if (!meta.customName && isUntitledSessionName(meta.name)) {
           const first = history.find(m => m.role === 'user') ?? user;
           const question = project(first, '')?.text ?? text;
           const expectedName = sessionTitleFallback(question) || 'New chat';

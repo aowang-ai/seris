@@ -29,7 +29,7 @@ test('composer permission selection allows repeated saves, persists after reload
     answer([{ type: 'text', text: 'Third variant saved' }]),
   ]);
   let executions = 0, prompts = 0;
-  tools.register(defineTool({ name: 'strategy_save_draft', category: 'workspace', description: 'Permission UI writer',
+  tools.register(defineTool({ name: 'strategy_save_draft', category: 'workspace', approval: 'ask', description: 'Permission UI writer',
     parameters: { type: 'object', properties: { variant: { type: 'number' } } }, execute() { return { saved: ++executions }; } }));
   page.on('request', request => { if (/\/api\/sessions\/[^/]+\/prompt$/.test(request.url()) && request.method() === 'POST') prompts++; });
   const input = page.getByLabel('消息', { exact: true });
@@ -37,7 +37,8 @@ test('composer permission selection allows repeated saves, persists after reload
   const select = async label => {
     await picker.click();
     await page.getByRole('option', { name: new RegExp(`^${label}(?:\\s|$)`) }).click();
-    await until(async () => (await picker.textContent()).includes(label) && !(await picker.isDisabled()));
+    const triggerLabel = label === '任何行动都允许' ? '全部允许' : label;
+    await until(async () => (await picker.textContent()).includes(triggerLabel) && !(await picker.isDisabled()));
   };
   assert.match(await picker.textContent(), /逐次确认/);
   await input.fill('连续保存两个策略');
@@ -51,7 +52,7 @@ test('composer permission selection allows repeated saves, persists after reload
   const sessionId = (await runtime.listSessions())[0].id;
   assert.equal((await runtime.listSessions())[0].approvalMode, 'allow-all');
   await page.reload();
-  await until(async () => (await picker.textContent()).includes('任何行动都允许'));
+  await until(async () => (await picker.textContent()).includes('全部允许'));
   await select('逐次确认');
   await input.fill('保存第三个策略');
   await input.press('Enter');

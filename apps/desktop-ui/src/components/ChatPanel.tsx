@@ -83,11 +83,17 @@ function ToolResult({ message: m }: { message: HistoryEntry }) {
 export function ChatPanel(p: ChatPanelProps) {
   const { t, language, locale } = useI18n();
   const log = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false);
   const contextIcon = p.context ? instrumentIcon(p.context.instrument.symbol) : null;
   useEffect(() => {
     log.current?.scrollTo({ top: log.current.scrollHeight });
   }, [p.messages]);
+  useEffect(() => {
+    if (!input.current) return;
+    input.current.style.height = 'auto';
+    input.current.style.height = `${Math.min(input.current.scrollHeight, 200)}px`;
+  }, [p.draft, p.compact]);
   return (
     <section
       className={`chat-panel ${p.compact ? 'chat-compact' : ''}`}
@@ -222,8 +228,11 @@ export function ChatPanel(p: ChatPanelProps) {
           </p>
         )}
         <div className="seris-composer">
-          <input
+          <textarea
+            ref={input}
+            rows={2}
             aria-label={t('Message')}
+            title={t('Enter to send · Shift+Enter for a new line')}
             value={p.draft}
             onChange={(e) => p.onDraft(e.target.value)}
             onCompositionStart={() => { composing.current = true; }}
@@ -232,9 +241,10 @@ export function ChatPanel(p: ChatPanelProps) {
             onKeyDown={(e) => {
               // WebKit can end composition before this keydown and report
               // isComposing=false. keyCode 229 still identifies the IME key.
-              if (e.key === 'Enter' && (composing.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229)) {
-                e.preventDefault();
-              }
+              if (e.key !== 'Enter' || e.shiftKey) return;
+              e.preventDefault();
+              if (composing.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+              p.onSend();
             }}
             placeholder={
               !p.ready
@@ -246,58 +256,32 @@ export function ChatPanel(p: ChatPanelProps) {
             disabled={!p.ready}
           />
           <div className="composer-controls">
-            <div className="composer-options">
-              {!!p.modelConfig?.selected && (
+            <ApprovalModePicker value={p.approvalMode} onChange={p.onApprovalMode} disabled={p.approvalModePending} />
+            <div className="composer-actions">
+              <div className="composer-model" title={p.busy && p.runningModel ? p.runningModel.modelId : undefined}>
                 <ModelPicker
-                  choices={connectionModelChoices(p.modelConfig!)}
-                  value={p.modelConfig!.selected}
+                  choices={p.modelConfig ? connectionModelChoices(p.modelConfig) : []}
+                  value={p.modelConfig?.selected ?? null}
                   onChange={s => p.onSelectModel?.(s)}
+                  onSettings={p.onModelSettings}
                   compact favorites
                 />
-              )}
-              <button
-                type="button"
-                aria-label={t('Model settings')}
-                onClick={p.onModelSettings}
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+              </div>
+              {p.busy ? (
+                <button type="button" className="composer-submit stop-button" aria-label={t('Stop')} title={t('Stop')} onClick={p.onStop}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="composer-submit send-button"
+                  aria-label={t('Send ↑')}
+                  title={t('Send ↑')}
+                  disabled={!p.ready || p.approvalModePending || !p.draft.trim()}
                 >
-                  <path d="m9 3-.5 2a8 8 0 0 0-2 1L4.5 5.5 2 10l1.5 1.5a8 8 0 0 0 0 2L2 15l2.5 4.5 2-.5a8 8 0 0 0 2 1l.5 2h6l.5-2a8 8 0 0 0 2-1l2 .5L22 15l-1.5-1.5a8 8 0 0 0 0-2L22 10l-2.5-4.5-2 .5a8 8 0 0 0-2-1L15 3Z" />
-                  <circle cx="12" cy="12.5" r="3" />
-                </svg>
-              </button>
-              <ApprovalModePicker value={p.approvalMode} onChange={p.onApprovalMode} disabled={p.approvalModePending} />
-              {p.runningModel && (
-                <span
-                  className="max-w-[120px] truncate"
-                  title={p.runningModel.modelId}
-                >
-                  {p.runningModel.modelId}
-                </span>
-              )}
-            </div>
-            <div className="composer-actions">
-              {p.busy && (
-                <button type="button" onClick={p.onStop}>
-                  {t('Stop')}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 19V5m-7 7 7-7 7 7" /></svg>
                 </button>
               )}
-              <button
-                type="submit"
-                className="send-button"
-                disabled={!p.ready || p.busy || p.approvalModePending || !p.draft.trim()}
-              >
-                {t('Send ↑')}
-              </button>
             </div>
           </div>
         </div>
